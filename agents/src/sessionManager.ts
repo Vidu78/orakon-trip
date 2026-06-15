@@ -1,4 +1,4 @@
-import type { DeviceType, Telemetry, TripStatus } from './types';
+import type { DeviceSummary, DeviceType, Telemetry, TripStatus } from './types';
 
 export interface DeviceSession {
   deviceId: string;
@@ -6,11 +6,6 @@ export interface DeviceSession {
   socketId: string;
   tripId: string;
   joinedAt: string;
-}
-
-export interface DeviceSummary {
-  deviceId: string;
-  deviceType: DeviceType;
 }
 
 /**

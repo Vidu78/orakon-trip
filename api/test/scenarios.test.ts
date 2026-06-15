@@ -17,9 +17,8 @@ test('Orakon Trip MVP scenarios', async (t) => {
     app.inject({
       method,
       url,
-      ...(body !== undefined
-        ? { payload: body, headers: { 'content-type': 'application/json' } }
-        : {}),
+      payload: body === undefined ? undefined : JSON.stringify(body),
+      headers: body === undefined ? undefined : { 'content-type': 'application/json' },
     });
 
   let tripId = '';

@@ -33,6 +33,12 @@ export interface Device {
   registeredAt: string;
 }
 
+/** Lightweight view of a connected device, broadcast over the sync channel. */
+export interface DeviceSummary {
+  deviceId: string;
+  deviceType: DeviceType;
+}
+
 export interface Telemetry {
   gps: GeoPoint;
   /** Current battery % (0–100). */

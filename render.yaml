@@ -1,0 +1,26 @@
+# Render Blueprint — deploys the Orakon Trip API (Fastify + Socket.io).
+# Render supports long-running services with WebSockets (unlike Vercel serverless).
+# New → Blueprint → pick this repo. Render reads this file and creates the service.
+services:
+  - type: web
+    name: orakon-trip-api
+    runtime: node
+    plan: free
+    buildCommand: npm install --include=dev
+    startCommand: npm run start:api
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: HOST
+        value: 0.0.0.0
+      # Render injects PORT automatically; the API reads process.env.PORT.
+      # Optional — leave blank for the keyword fallback, or paste a key:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: INTENT_MODEL
+        value: claude-haiku-4-5
+      # Optional — set to a Postgres/Supabase URL to persist; blank = in-memory:
+      - key: DATABASE_URL
+        sync: false

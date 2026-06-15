@@ -1,0 +1,39 @@
+# Postgres + API. Run from the repo root:
+#   docker compose -f scripts/docker-compose.yml up --build
+# (or `npm run stack:up`). For just the DB: `npm run db:up`.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: orakon
+      POSTGRES_PASSWORD: orakon
+      POSTGRES_DB: orakon
+    ports:
+      - '5432:5432'
+    volumes:
+      - orakon-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U orakon -d orakon']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://orakon:orakon@db:5432/orakon
+      HOST: 0.0.0.0
+      PORT: 4000
+      LOG_LEVEL: info
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      INTENT_MODEL: ${INTENT_MODEL:-claude-haiku-4-5}
+    ports:
+      - '4000:4000'
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  orakon-db:

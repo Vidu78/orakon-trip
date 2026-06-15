@@ -1,0 +1,19 @@
+{
+  "name": "@orakon/device-sim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "WebSocket device simulators: vehicle, smartwatch, dashboard",
+  "scripts": {
+    "sim:vehicle": "tsx src/vehicle.ts",
+    "sim:watch": "tsx src/smartwatch.ts",
+    "sim:dashboard": "tsx src/dashboard.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.8.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2"
+  }
+}
