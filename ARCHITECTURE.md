@@ -27,6 +27,45 @@ Orakon Trip keeps a single trip's state coherent across a car, a smartwatch, and
                   └────────────────────┘
 ```
 
+## Component responsibilities
+
+```mermaid
+flowchart TB
+  subgraph Devices
+    Car["Vehicle Sim<br/>telemetry"]
+    Watch["Smartwatch Sim<br/>ETA, actions"]
+    Laptop["Dashboard Sim<br/>controls"]
+  end
+  Dash["Dashboard PWA — SvelteKit/Vercel<br/>REST + WebSocket client"]
+  subgraph API["API — Render (Fastify)"]
+    REST["REST: /trips /devices /intent /audit"]
+    WS["Socket.io sync channel"]
+    SM["SessionManager (continuity)"]
+    Router["LLM router: Groq → Anthropic → keyword"]
+  end
+  Groq["Groq LLM"]
+  DB[("Supabase Postgres<br/>trips · devices · events")]
+  Car -->|WS telemetry| WS
+  Watch <-->|WS| WS
+  Laptop -->|WS control| WS
+  Dash <-->|REST| REST
+  Dash <-->|WS| WS
+  REST --> Router --> Groq
+  REST --> DB
+  WS --> SM
+  WS --> DB
+```
+
+| Component | Responsibility |
+| --- | --- |
+| **Dashboard PWA** | UI (map, create-trip form, controls) · REST + WebSocket client |
+| **API (Render)** | REST + WebSocket broker · LLM router · cross-device continuity (SessionManager) |
+| **Supabase DB** | `trips` (persist), `devices`, `events` (append-only audit log) |
+| **Groq LLM** | intent classification (NL → action) |
+| **Vehicle Sim** | telemetry emitter (gps / battery / speed) |
+| **Smartwatch Sim** | ETA display + actions (accept/dismiss, request charger) |
+| **Dashboard Sim** | sends `pause` / `resume` / `redirect` controls |
+
 ## Components
 
 ### `agents/` — agent core (shared library)
@@ -37,7 +76,7 @@ Orakon Trip keeps a single trip's state coherent across a car, a smartwatch, and
 ### `api/` — Fastify server
 - REST routes (`routes.ts`) for CRUD + intent + audit. Every state mutation also (a) appends to the audit log and (b) broadcasts to the trip's Socket.io room, so REST and WS stay consistent.
 - Socket.io attaches to the **same HTTP server** Fastify creates (`app.server`), so one port serves both REST and WS.
-- `llm/intent.ts` classifies free text into `route | pause | charger` using Claude Haiku via **forced tool-use** (guaranteed JSON shape), with a deterministic keyword fallback when no API key is present.
+- `llm/intent.ts` classifies free text into `route | pause | charger` via a **provider router**: **Groq** (OpenAI-compatible, JSON mode) → **Anthropic** (Claude, forced tool-use) → deterministic **keyword** fallback. It degrades gracefully and never blocks the endpoint; `/health` reports the active `intent.provider`.
 
 ### `device-sim/` — simulators
 Three Node processes that exercise the system as real devices would:
