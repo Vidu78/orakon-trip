@@ -1,0 +1,18 @@
+Week,Task,Category,Owner,Priority,Status,Notes
+1,Definire ICP e verticale d'ingresso (ricarica EV),Strategy,Founder,High,Todo,Focus su un solo dolore acuto
+1,Registrare demo video 2 min,Marketing,Founder,High,Todo,Script in demo-video-script.md
+1,Rifinire one-pager e deck,Marketing,Founder,High,Todo,Validare i placeholder di mercato
+1,Setup CRM lista target (30-50),Sales,Founder,High,Todo,Vedi target-investitori-partner-eu.md
+1,Aggiungere Ignored Build Step Vercel,Tech,Founder,Low,Todo,Evita rebuild dashboard su modifiche API
+2,Outreach 20 investitori + 20 partner,Sales,Founder,High,Todo,Template in email-outreach-template.md
+2,Avviare ricerca co-founder,Hiring,Founder,High,Todo,Canali in cofounder-search-list.md
+2,Verticale ricarica: mock integrazione charger,Tech,Founder,Medium,Todo,Suggerimento charger reale nel flusso intent
+2,Metriche d'uso base (eventi/sessioni),Tech,Founder,Medium,Todo,Sfruttare audit log events
+3,Primi 5 colloqui (investitori/partner),Sales,Founder,High,Todo,Qualificare fit e ask
+3,Definire pricing ipotesi + modello,Strategy,Founder,Medium,Todo,Validare con design partner
+3,Hardening: rate limit + validazione input API,Tech,Founder,Medium,Todo,Sicurezza pre-pilota
+3,Persistenza audit + dashboard storico viaggi,Tech,Founder,Low,Todo,Valore per flotte
+4,Chiudere 1-3 design partner (LOI),Sales,Founder,High,Todo,Anche solo lettera d'intenti
+4,Follow-up investitori + aggiornamento metriche,Sales,Founder,High,Todo,Cadenza 5-7 giorni
+4,Pianificare pilota (scope + KPI),Strategy,Founder,Medium,Todo,KPI: continuità, intent accuracy, retention
+4,Retro 30 giorni + piano 60-90,Strategy,Founder,Medium,Todo,Decidere doppio-giù o pivot
