@@ -23,15 +23,20 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   await app.register(registerRoutes);
 
-  app.get('/health', async () => ({
-    ok: true,
-    store: store.kind,
-    intent: {
-      // booleano, non espone la chiave — solo per diagnostica della config
-      configured: Boolean(process.env.ANTHROPIC_API_KEY),
-      model: process.env.INTENT_MODEL ?? 'claude-haiku-4-5-20251001',
-    },
-  }));
+  app.get('/health', async () => {
+    const provider = process.env.GROQ_API_KEY
+      ? 'groq'
+      : process.env.ANTHROPIC_API_KEY
+        ? 'anthropic'
+        : 'fallback';
+    const model =
+      provider === 'groq'
+        ? (process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile')
+        : provider === 'anthropic'
+          ? (process.env.INTENT_MODEL ?? 'claude-haiku-4-5-20251001')
+          : null;
+    return { ok: true, store: store.kind, intent: { provider, model } };
+  });
 
   app.addHook('onClose', async () => {
     io.close();

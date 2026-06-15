@@ -16,7 +16,12 @@ services:
       - key: HOST
         value: 0.0.0.0
       # Render injects PORT automatically; the API reads process.env.PORT.
-      # Optional — leave blank for the keyword fallback, or paste a key:
+      # Intent LLM provider — set ONE key. Groq has priority over Anthropic.
+      # Leave both blank to use the built-in keyword classifier.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: INTENT_MODEL
