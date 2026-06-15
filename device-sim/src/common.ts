@@ -11,20 +11,61 @@ export const DEMO_ROUTE: GeoPoint[] = [
   { lat: 41.9028, lng: 12.4964, label: 'Roma' },
 ];
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`POST ${path} → ${res.status} ${await res.text()}`);
-  return res.json() as Promise<T>;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Wait until the API is awake. Free hosts (e.g. Render) spin down on inactivity
+ * and the first requests can fail/return transient errors during cold start.
+ */
+export async function warmup(maxWaitMs = 90_000): Promise<void> {
+  const deadline = Date.now() + maxWaitMs;
+  let announced = false;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${API_URL}/health`);
+      if (res.ok) {
+        if (announced) console.log('[sim] API sveglia.');
+        return;
+      }
+    } catch {
+      /* not reachable yet */
+    }
+    if (!announced) {
+      console.log(`[sim] attendo il risveglio dell'API (${API_URL})…`);
+      announced = true;
+    }
+    await sleep(3000);
+  }
+  throw new Error(`API non raggiungibile entro ${maxWaitMs}ms: ${API_URL}`);
+}
+
+async function postJson<T>(path: string, body: unknown, retries = 4): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const res = await fetch(`${API_URL}${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      // 404/5xx during cold start → retry; genuine 4xx → fail fast.
+      if (!res.ok && (res.status >= 500 || res.status === 404) && attempt <= retries) {
+        await sleep(3000);
+        continue;
+      }
+      if (!res.ok) throw new Error(`POST ${path} → ${res.status} ${await res.text()}`);
+      return res.json() as Promise<T>;
+    } catch (err) {
+      if (attempt > retries) throw err;
+      await sleep(3000);
+    }
+  }
 }
 
 export async function registerDevice(
   type: DeviceType,
   capabilities: string[],
 ): Promise<{ id: string; type: DeviceType }> {
+  await warmup();
   return postJson('/devices', { type, capabilities });
 }
 
