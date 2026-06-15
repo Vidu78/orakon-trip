@@ -2,19 +2,52 @@
   import { onMount } from 'svelte';
   import 'leaflet/dist/leaflet.css';
   import { API_URL, TRIP_ID } from '$lib/config';
-  import type { DeviceSummary, FeedEntry, Telemetry, Trip, TripStatus } from '$lib/types';
+  import type { DeviceSummary, FeedEntry, GeoPoint, Telemetry, Trip, TripStatus } from '$lib/types';
 
+  let activeTripId = $state(TRIP_ID);
   let trip = $state<Trip | null>(null);
   let telemetry = $state<Telemetry | null>(null);
   let devices = $state<DeviceSummary[]>([]);
   let feed = $state<FeedEntry[]>([]);
   let connected = $state(false);
 
+  // Create-trip form.
+  let startInput = $state('Milano');
+  let endInput = $state('Roma');
+  let batteryInput = $state(80);
+  let creating = $state(false);
+  let createError = $state('');
+  let created = $state<{ id: string; status: string } | null>(null);
+
   let mapEl: HTMLDivElement;
-  // Leaflet is loaded dynamically (client-only).
   let map: import('leaflet').Map | undefined;
   let marker: import('leaflet').CircleMarker | undefined;
+  let routeLine: import('leaflet').Polyline | undefined;
   let L: typeof import('leaflet') | undefined;
+  let socket: import('socket.io-client').Socket | undefined;
+
+  // A few well-known cities so the text inputs can be names, not just coords.
+  const CITIES: Record<string, GeoPoint> = {
+    milano: { lat: 45.4642, lng: 9.19, label: 'Milano' },
+    roma: { lat: 41.9028, lng: 12.4964, label: 'Roma' },
+    torino: { lat: 45.0703, lng: 7.6869, label: 'Torino' },
+    bologna: { lat: 44.4949, lng: 11.3426, label: 'Bologna' },
+    firenze: { lat: 43.7696, lng: 11.2558, label: 'Firenze' },
+    napoli: { lat: 40.8518, lng: 14.2681, label: 'Napoli' },
+    genova: { lat: 44.4056, lng: 8.9463, label: 'Genova' },
+    venezia: { lat: 45.4408, lng: 12.3155, label: 'Venezia' },
+    bari: { lat: 41.1171, lng: 16.8719, label: 'Bari' },
+    palermo: { lat: 38.1157, lng: 13.3615, label: 'Palermo' },
+  };
+
+  /** Accept a known city name or "lat,lng" → GeoPoint. */
+  function parsePoint(input: string): GeoPoint | null {
+    const s = input.trim();
+    if (!s) return null;
+    const coords = s.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/);
+    if (coords) return { lat: parseFloat(coords[1]), lng: parseFloat(coords[2]), label: s };
+    return CITIES[s.toLowerCase()] ? { ...CITIES[s.toLowerCase()] } : null;
+  }
 
   const eta = $derived.by(() => {
     if (!telemetry || !trip) return '—';
@@ -22,13 +55,63 @@
     if (telemetry.speed <= 0) return 'paused';
     return `${Math.round((km / telemetry.speed) * 60)} min`;
   });
-
   const kmLeft = $derived.by(() =>
     telemetry && trip ? haversineKm(telemetry.gps, trip.end).toFixed(0) : '—',
   );
 
+  async function createTrip() {
+    createError = '';
+    created = null;
+    const start = parsePoint(startInput);
+    const end = parsePoint(endInput);
+    if (!start || !end) {
+      createError = 'Usa una città nota (es. Milano) o coordinate "lat,lng".';
+      return;
+    }
+    creating = true;
+    try {
+      const res = await fetch(`${API_URL}/trips`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ start, end, route: [], batteryEst: Number(batteryInput) }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const t = (await res.json()) as Trip;
+      created = { id: t.id, status: t.status };
+      await switchTrip(t.id);
+    } catch (e) {
+      createError = `Errore: ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      creating = false;
+    }
+  }
+
+  /** Point the whole dashboard at a (newly created) trip. */
+  async function switchTrip(tripId: string) {
+    activeTripId = tripId;
+    telemetry = null;
+    feed = [];
+    marker?.remove();
+    marker = undefined;
+    await loadTrip(tripId);
+    socket?.emit('trip:join', { tripId, deviceId: 'web-dashboard', deviceType: 'laptop' });
+  }
+
+  async function loadTrip(tripId: string) {
+    try {
+      const res = await fetch(`${API_URL}/trips/${tripId}`);
+      if (res.ok) {
+        const data = (await res.json()) as { trip: Trip };
+        trip = data.trip;
+        drawRoute();
+      }
+    } catch {
+      /* live channel will fill in */
+    }
+  }
+
   async function control(status: TripStatus) {
-    await fetch(`${API_URL}/trips/${TRIP_ID}`, {
+    await fetch(`${API_URL}/trips/${activeTripId}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -60,8 +143,9 @@
 
   function drawRoute() {
     if (!map || !L || !trip?.route?.length) return;
+    routeLine?.remove();
     const pts = trip.route.map((p) => [p.lat, p.lng] as [number, number]);
-    L.polyline(pts, { color: '#4f8cff', weight: 4, opacity: 0.85 }).addTo(map);
+    routeLine = L.polyline(pts, { color: '#4f8cff', weight: 4, opacity: 0.85 }).addTo(map);
     if (pts.length > 1) map.fitBounds(pts, { padding: [40, 40] });
   }
 
@@ -77,8 +161,6 @@
   }
 
   onMount(() => {
-    let socket: import('socket.io-client').Socket | undefined;
-
     (async () => {
       L = (await import('leaflet')).default;
       map = L.map(mapEl).setView([44, 11], 6);
@@ -87,17 +169,7 @@
         maxZoom: 19,
       }).addTo(map);
 
-      // Initial trip + audit.
-      try {
-        const res = await fetch(`${API_URL}/trips/${TRIP_ID}`);
-        if (res.ok) {
-          const data = (await res.json()) as { trip: Trip; events: FeedEntry[] };
-          trip = data.trip;
-          drawRoute();
-        }
-      } catch {
-        /* API may be down; the live channel will fill in */
-      }
+      await loadTrip(activeTripId);
 
       const { io } = await import('socket.io-client');
       socket = io(API_URL, { transports: ['websocket', 'polling'] });
@@ -105,7 +177,7 @@
       socket.on('connect', () => {
         connected = true;
         socket?.emit('trip:join', {
-          tripId: TRIP_ID,
+          tripId: activeTripId,
           deviceId: 'web-dashboard',
           deviceType: 'laptop',
         });
@@ -142,6 +214,19 @@
 
 <svelte:head><title>Orakon Trip — Dashboard</title></svelte:head>
 
+<datalist id="cities">
+  <option value="Milano"></option>
+  <option value="Roma"></option>
+  <option value="Torino"></option>
+  <option value="Bologna"></option>
+  <option value="Firenze"></option>
+  <option value="Napoli"></option>
+  <option value="Genova"></option>
+  <option value="Venezia"></option>
+  <option value="Bari"></option>
+  <option value="Palermo"></option>
+</datalist>
+
 <div class="app">
   <header>
     <div class="brand">
@@ -159,8 +244,30 @@
 
     <aside>
       <section class="card">
+        <h2>Create trip</h2>
+        <label>Start
+          <input list="cities" bind:value={startInput} placeholder="Milano or 45.46,9.19" />
+        </label>
+        <label>End
+          <input list="cities" bind:value={endInput} placeholder="Roma or 41.90,12.49" />
+        </label>
+        <label>Battery est. %
+          <input type="number" min="0" max="100" bind:value={batteryInput} />
+        </label>
+        <button class="primary" onclick={createTrip} disabled={creating}>
+          {creating ? 'Creating…' : 'Create trip'}
+        </button>
+        {#if created}
+          <p class="ok">✓ Trip <b>{created.id}</b> — {created.status}</p>
+        {/if}
+        {#if createError}
+          <p class="err">{createError}</p>
+        {/if}
+      </section>
+
+      <section class="card">
         <h2>Trip</h2>
-        <div class="row"><span>ID</span><b>{trip?.id ?? TRIP_ID}</b></div>
+        <div class="row"><span>ID</span><b>{trip?.id ?? activeTripId}</b></div>
         <div class="row">
           <span>State</span>
           <b class="badge {trip?.status ?? 'unknown'}">{trip?.status ?? '—'}</b>
@@ -293,6 +400,23 @@
     letter-spacing: 0.08em;
     color: #8a96b3;
   }
+  label {
+    display: block;
+    font-size: 12px;
+    color: #8a96b3;
+    margin-bottom: 8px;
+  }
+  input {
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 4px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #2a3a66;
+    background: #0d1428;
+    color: #e7ecf5;
+    font-size: 13px;
+  }
   .row {
     display: flex;
     justify-content: space-between;
@@ -328,6 +452,29 @@
   }
   button:hover {
     background: #1d2c52;
+  }
+  button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+  button.primary {
+    width: 100%;
+    margin-top: 4px;
+    background: #2a4ea0;
+    border-color: #3a64c8;
+  }
+  button.primary:hover {
+    background: #335fc0;
+  }
+  .ok {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: #57e08a;
+  }
+  .err {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: #ff7a90;
   }
   .devices {
     display: flex;
