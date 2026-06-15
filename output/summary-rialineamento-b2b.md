@@ -14,11 +14,13 @@
 3. **Numeri marcati `[STIMA — DA VALIDARE]`**: rimossi i riferimenti `[web:xxx]`; servono fonti reali.
 4. **Email investitori rimosse**: indirizzi generici non verificati → usare canali ufficiali / intro calde.
 
-## Numeri (forniti dal founder — da validare/riconciliare)
-- **Mercato di riferimento e-LCV EU**: $7.5B → $29.1B (2023–29), CAGR ~25% — *tailwind di settore, NON il TAM software*.
-- **Pricing**: €15 (base) / €25 (Pro) per veicolo/mese — *validare con pilot*.
-- **Ask**: €750k pre-seed (12 mesi, team 3).
-- **SOM** 🚩 *incoerenza da risolvere*: 500–800 veicoli × €15–25/mese ≈ **€90–240k ARR**, NON $15–25M (per $15–25M servono ~50–80k veicoli). Scegliere: alzare i veicoli o ridimensionare il SOM.
+## Numeri (STIME — da validare con fonti)
+- **Contesto (veicoli e-LCV EU)**: $7.5B → $29.1B (2023–29), CAGR ~25% — *tailwind, NON il TAM software*.
+- **TAM software (bottom-up)**: ~$650M (≈2,5M veicoli EV flotta EU × €20/mese × 12) — *verificare il n° veicoli*.
+- **SAM**: ~$78M (12%). **SOM 3 anni**: ~$19,5M (3% del TAM) ≈ ~80k veicoli.
+- **Anno 1 (pilot)**: 500–800 veicoli ≈ €90–240k ARR (punto di partenza, *non* il SOM).
+- **Pricing**: €15 / €25 veicolo/mese. **Ask**: €750k pre-seed (12 mesi, team 3).
+- ✅ Incoerenza SOM risolta: SOM-3-anni (~80k veicoli, $19,5M) separato dal pilot anno-1 (500–800 veicoli).
 
 ## Validazione prima di scolpire (30 giorni)
 - 3–5 call con fleet manager (dolore: "coordinare carica + posizione + chi mando").

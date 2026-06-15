@@ -28,10 +28,11 @@ La **centrale operativa realtime** per piccole/medie flotte EV.
 - *Link: orakon-trip-dashboard.vercel.app · video: demo-video-script.md*
 
 ---
-## 5. Mercato
-- **Mercato di riferimento** (e-LCV EU): $7.5B → $29.1B (2023–29), CAGR ~25% *[fonte]* — è il mercato **veicoli** (tailwind).
-- **TAM software** (il nostro): veicoli in flotta × €15–25/veicolo/mese × 12. *[STIMA]*
-- **SOM**: anno 1 ~500–800 veicoli (**~€90–240k ARR**); 3 anni obiettivo €[___] *(per ~$15–25M → ~50–80k veicoli, da riconciliare)*.
+## 5. Mercato *(stime da validare)*
+- **Contesto** (veicoli e-LCV EU): $7.5B → $29.1B (2023–29), CAGR ~25% *[fonte]* — tailwind, non TAM.
+- **TAM software (bottom-up)**: ~$650M (≈2,5M veicoli EV flotta EU × €20/mese × 12).
+- **SAM**: ~$78M (12%). **SOM 3 anni**: ~$19,5M (3% → ~80k veicoli).
+- **Anno 1 (pilot)**: 500–800 veicoli ≈ €90–240k ARR.
 
 ---
 ## 6. Perché ora

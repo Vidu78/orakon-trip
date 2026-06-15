@@ -16,12 +16,13 @@
 - **Intent in linguaggio naturale**: "trova un charger" → azione (charger/pause/route).
 - **Audit append-only**: tracciabilità eventi (valore B2B, quasi nullo in B2C).
 
-## Mercato
+## Mercato — *tutte STIME da validare con fonti*
 > Distinzione cruciale: il **mercato dei veicoli** (e-LCV) è il *contesto*, non il tuo TAM. Il TAM di Orakon è la **spesa software** di gestione flotte.
-- **Mercato di riferimento (e-LCV EU)**: USD 7.5B (2023) → 29.1B (2029), CAGR ~25%. *[fonte da inserire]* — **tailwind di settore, NON il TAM del SaaS**.
-- **TAM software (serviceable)** = veicoli in flotta EU × ARPU annuo (€15–25/veicolo/mese × 12). *[STIMA — calcolare con fonte]*
-- **SOM anno 1 (pilot)**: 500–800 veicoli → **~€90–240k ARR** (a €15–25/veicolo/mese).
-- **SOM 3 anni**: obiettivo da definire. ⚠️ *coerenza*: per ~$15–25M servono **~50–80k veicoli**; 500–800 veicoli valgono ~€90–240k ARR — **riconciliare**.
+- **Contesto / tailwind (veicoli e-LCV EU)**: USD 7.5B (2023) → 29.1B (2029), CAGR ~25%. *[fonte]* — **NON è il TAM del SaaS**.
+- **TAM software (bottom-up)**: **~$650M** = ~2,5M veicoli commerciali EV in flotte EU × €20/veicolo/mese × 12. *[STIMA — verificare il n° veicoli con fonte: report fleet telematics EU]*
+- **SAM**: ~$78M (Italia + EU sud, ~12% del TAM).
+- **SOM 3 anni**: ~$19,5M (3% del TAM) ≈ **~80k veicoli serviti** — obiettivo ambizioso.
+- **Anno 1 (pilot)**: 500–800 veicoli ≈ **€90–240k ARR** — il punto di partenza, *non* il SOM.
 
 ## Value proposition B2B
 - **Efficienza operativa**: coordinamento carica + posizione + assegnazione mezzi.
