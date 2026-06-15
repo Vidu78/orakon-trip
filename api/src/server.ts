@@ -23,7 +23,15 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   await app.register(registerRoutes);
 
-  app.get('/health', async () => ({ ok: true, store: store.kind }));
+  app.get('/health', async () => ({
+    ok: true,
+    store: store.kind,
+    intent: {
+      // booleano, non espone la chiave — solo per diagnostica della config
+      configured: Boolean(process.env.ANTHROPIC_API_KEY),
+      model: process.env.INTENT_MODEL ?? 'claude-haiku-4-5-20251001',
+    },
+  }));
 
   app.addHook('onClose', async () => {
     io.close();
