@@ -1,0 +1,17 @@
+name: keep-alive
+
+# Pinga l'API su Render ogni ~10 minuti per evitare lo spin-down del piano Free.
+# Nota: tiene il servizio sempre attivo → consuma le ore-istanza gratuite mensili.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping API /health
+        run: |
+          echo "Ping $(date -u)"
+          curl -fsS --max-time 90 https://orakon-trip-api.onrender.com/health || echo "ping fallito (cold start?), riprovo al prossimo giro"
