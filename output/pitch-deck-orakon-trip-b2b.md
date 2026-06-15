@@ -28,11 +28,12 @@ La **centrale operativa realtime** per piccole/medie flotte EV.
 - *Link: orakon-trip-dashboard.vercel.app · video: demo-video-script.md*
 
 ---
-## 5. Mercato *(stime da validare)*
-- **Contesto** (veicoli e-LCV EU): $7.5B → $29.1B (2023–29), CAGR ~25% *[fonte]* — tailwind, non TAM.
-- **TAM software (bottom-up)**: ~$650M (≈2,5M veicoli EV flotta EU × €20/mese × 12).
-- **SAM**: ~$78M (12%). **SOM 3 anni**: ~$19,5M (3% → ~80k veicoli).
-- **Anno 1 (pilot)**: 500–800 veicoli ≈ €90–240k ARR.
+## 5. Mercato *(fonti: ACEA + report)*
+- **Contesto** (ACEA 2026): ~31M van EU, ~0,8% BEV ≈ **~290k van EV** oggi (CAGR ~25%).
+- **TAM**: ~$5,1B EV fleet telematics/software EU *[report]*.
+- **SAM**: ~$612M a regime (~12% TAM) · ~$75M oggi (bottom-up).
+- **SOM 3 anni**: **~$1–3M ARR** (4–12k veicoli) · **Anno 1**: 500–800 veicoli ≈ €90–240k ARR.
+- *SOM ancorato ai veicoli: $153M = ~640k veicoli > intero parco EU (~290k).*
 
 ---
 ## 6. Perché ora
@@ -65,6 +66,6 @@ La **centrale operativa realtime** per piccole/medie flotte EV.
 
 ---
 ## 12. Team & Ask
-- Founder: Vincenzo Durante (full-stack). Co-founder BD/fleet in cerca.
+- Founder: Vincenzo Durante (full-stack) — Noci (Bari), Italia. Co-founder BD/fleet in cerca.
 - **Ask: pre-seed €750k** (12 mesi runway, team 3) — prodotto + 2 pilot + GTM.
-- 📧 vincedurante@gmail.com · github.com/Vidu78/orakon-trip
+- 📧 vincedurante@gmail.com · 🔗 linkedin.com/in/vincenzo-durante-94706498 · github.com/Vidu78/orakon-trip

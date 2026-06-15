@@ -16,13 +16,13 @@
 - **Intent in linguaggio naturale**: "trova un charger" → azione (charger/pause/route).
 - **Audit append-only**: tracciabilità eventi (valore B2B, quasi nullo in B2C).
 
-## Mercato — *tutte STIME da validare con fonti*
-> Distinzione cruciale: il **mercato dei veicoli** (e-LCV) è il *contesto*, non il tuo TAM. Il TAM di Orakon è la **spesa software** di gestione flotte.
-- **Contesto / tailwind (veicoli e-LCV EU)**: USD 7.5B (2023) → 29.1B (2029), CAGR ~25%. *[fonte]* — **NON è il TAM del SaaS**.
-- **TAM software (bottom-up)**: **~$650M** = ~2,5M veicoli commerciali EV in flotte EU × €20/veicolo/mese × 12. *[STIMA — verificare il n° veicoli con fonte: report fleet telematics EU]*
-- **SAM**: ~$78M (Italia + EU sud, ~12% del TAM).
-- **SOM 3 anni**: ~$19,5M (3% del TAM) ≈ **~80k veicoli serviti** — obiettivo ambizioso.
-- **Anno 1 (pilot)**: 500–800 veicoli ≈ **€90–240k ARR** — il punto di partenza, *non* il SOM.
+## Mercato — *fonti reali (ACEA + report); regola: il SOM si valida in **veicoli***
+> Il parco *veicoli* è il contesto; il TAM è il **software/telematica per flotte EV**. TAM/SAM possono essere top-down (mercato *potenziale*), ma il **SOM (cattura a 3 anni) è bottom-up sui veicoli reali**.
+- **Contesto (ACEA 2026)**: ~31M van (LCV) in EU, ~0,8% BEV ≈ **~290k van elettrici** oggi, CAGR ~25%. *[ACEA]*
+- **TAM (riferimento)**: **~$5,1B** — EV fleet telematics/software EU 2025. *[report — verificare citazione]*
+- **SAM (potenziale a regime)**: **~$612M** (~12% del TAM) — quando il parco van EV commerciale sarà ampiamente elettrificato. *Oggi, bottom-up, il servibile è ~$75M (≈290k van × €240/anno).*
+- **SOM 3 anni**: **~$1–3M ARR** (≈4–12k veicoli, ~2–4% dei van EV attuali) — ancorato ai veicoli. ⚠️ *$153M = ~640k veicoli > intero parco EU (~290k): non usabile come SOM a 3 anni.*
+- **Anno 1 (pilot)**: 500–800 veicoli ≈ **€90–240k ARR**.
 
 ## Value proposition B2B
 - **Efficienza operativa**: coordinamento carica + posizione + assegnazione mezzi.
@@ -47,7 +47,7 @@
 - Demo video (3 scenari: start | pause | resume+charger)
 
 ## Team
-- **Founder**: Vincenzo Durante — full-stack
+- **Founder**: Vincenzo Durante — full-stack · Noci (Bari), Italia
 - **Co-founder (in cerca)**: profilo BD/fleet con accesso a operatori di flotta *(vedi cofounder-search-list.md)*
 
 ## Ask
@@ -57,3 +57,4 @@
 - Repo: https://github.com/Vidu78/orakon-trip
 - Dashboard: https://orakon-trip-dashboard.vercel.app · API: https://orakon-trip-api.onrender.com
 - Email: vincedurante@gmail.com
+- LinkedIn: https://www.linkedin.com/in/vincenzo-durante-94706498/

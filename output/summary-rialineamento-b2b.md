@@ -14,13 +14,13 @@
 3. **Numeri marcati `[STIMA — DA VALIDARE]`**: rimossi i riferimenti `[web:xxx]`; servono fonti reali.
 4. **Email investitori rimosse**: indirizzi generici non verificati → usare canali ufficiali / intro calde.
 
-## Numeri (STIME — da validare con fonti)
-- **Contesto (veicoli e-LCV EU)**: $7.5B → $29.1B (2023–29), CAGR ~25% — *tailwind, NON il TAM software*.
-- **TAM software (bottom-up)**: ~$650M (≈2,5M veicoli EV flotta EU × €20/mese × 12) — *verificare il n° veicoli*.
-- **SAM**: ~$78M (12%). **SOM 3 anni**: ~$19,5M (3% del TAM) ≈ ~80k veicoli.
-- **Anno 1 (pilot)**: 500–800 veicoli ≈ €90–240k ARR (punto di partenza, *non* il SOM).
-- **Pricing**: €15 / €25 veicolo/mese. **Ask**: €750k pre-seed (12 mesi, team 3).
-- ✅ Incoerenza SOM risolta: SOM-3-anni (~80k veicoli, $19,5M) separato dal pilot anno-1 (500–800 veicoli).
+## Numeri (fonti reali ACEA + report)
+- **Contesto (ACEA 2026)**: ~31M van EU, ~0,8% BEV ≈ **~290k van elettrici** oggi (CAGR ~25%).
+- **TAM (riferimento)**: **~$5,1B** EV fleet telematics/software EU 2025 *[report — verificare]*.
+- **SAM**: **~$612M** a regime (~12% TAM) · ~$75M oggi (bottom-up, 290k van × €240).
+- **SOM 3 anni**: **~$1–3M ARR** (4–12k veicoli) — *ancorato ai veicoli reali*.
+- **Anno 1 (pilot)**: 500–800 veicoli ≈ €90–240k ARR. **Pricing**: €15/€25. **Ask**: €750k.
+- 🔑 **Regola SOM**: si valida in VEICOLI. $153M = ~640k veicoli e $612M(SOM) = ~2,3M veicoli → entrambi > intero parco EU van EV (~290k). Top-down per TAM/SAM, bottom-up per il SOM.
 
 ## Validazione prima di scolpire (30 giorni)
 - 3–5 call con fleet manager (dolore: "coordinare carica + posizione + chi mando").
