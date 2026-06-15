@@ -1,0 +1,36 @@
+{
+  "name": "orakon-trip",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Orakon Trip — cross-device trip continuity MVP (car → smartwatch → laptop)",
+  "license": "MIT",
+  "workspaces": [
+    "agents",
+    "api",
+    "device-sim",
+    "dashboard"
+  ],
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "dev:api": "npm run dev --workspace @orakon/api",
+    "dev:dashboard": "npm run dev --workspace @orakon/dashboard",
+    "start:api": "npm run start --workspace @orakon/api",
+    "sim:vehicle": "npm run sim:vehicle --workspace @orakon/device-sim",
+    "sim:watch": "npm run sim:watch --workspace @orakon/device-sim",
+    "sim:dashboard": "npm run sim:dashboard --workspace @orakon/device-sim",
+    "test": "node --import tsx --test api/test/scenarios.test.ts",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "db:up": "docker compose -f scripts/docker-compose.yml up -d db",
+    "stack:up": "docker compose -f scripts/docker-compose.yml up --build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

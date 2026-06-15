@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.svelte-kit
+.output
+.env
+.env.local
+*.log
+.DS_Store
+coverage
