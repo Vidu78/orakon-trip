@@ -20,7 +20,7 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: INTENT_MODEL
-        value: claude-haiku-4-5
+        value: claude-haiku-4-5-20251001
       # Optional — set to a Postgres/Supabase URL to persist; blank = in-memory:
       - key: DATABASE_URL
         sync: false

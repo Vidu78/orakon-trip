@@ -34,15 +34,23 @@ const ACTIONS: IntentAction[] = ['route', 'pause', 'charger'];
  * keyword classifier when no ANTHROPIC_API_KEY is configured, so the endpoint
  * (and the test suite) runs with zero external dependencies.
  */
+let warnedNoKey = false;
+
 export async function classifyIntent(text: string): Promise<IntentResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return keywordClassify(text);
+  if (!apiKey) {
+    if (!warnedNoKey) {
+      console.warn('[intent] ANTHROPIC_API_KEY non impostata → uso il classificatore fallback');
+      warnedNoKey = true;
+    }
+    return keywordClassify(text);
+  }
 
   try {
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey });
     const response = await client.messages.create({
-      model: process.env.INTENT_MODEL ?? 'claude-haiku-4-5',
+      model: process.env.INTENT_MODEL ?? 'claude-haiku-4-5-20251001',
       max_tokens: 256,
       system: SYSTEM,
       tools: [TOOL],
@@ -63,8 +71,10 @@ export async function classifyIntent(text: string): Promise<IntentResult> {
       }
     }
     return keywordClassify(text);
-  } catch {
-    // Network error, bad key, refusal, etc. — degrade gracefully.
+  } catch (err) {
+    // Network error, bad key, bad model, refusal, etc. — degrade gracefully,
+    // but log the reason so misconfiguration is visible in the server logs.
+    console.error('[intent] chiamata Claude fallita → fallback:', err instanceof Error ? err.message : err);
     return keywordClassify(text);
   }
 }
