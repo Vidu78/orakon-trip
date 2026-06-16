@@ -47,3 +47,19 @@ export interface Charger {
   cost: string | null;
   town: string | null;
 }
+
+export interface ChargePlan {
+  needsCharge: boolean;
+  rangeKm: number;
+  reservePct: number;
+  startBatteryPct: number;
+  totalKm: number;
+  batteryAtArrivalPct: number;
+  stop: null | {
+    atKm: number;
+    point: { lat: number; lng: number };
+    batteryAtStopPct: number;
+    charger: Charger | null;
+    alternatives: Charger[];
+  };
+}

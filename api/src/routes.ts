@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { GeoPoint, TripStatus } from '../../agents/src/types';
+import { planCharging } from './chargePlan';
 import { findChargers } from './chargers';
 import { classifyIntent } from './llm/intent';
 import { roadRoute } from './routing';
@@ -147,4 +148,18 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       }
     },
   );
+
+  // GET /trips/:id/charge-plan?rangeKm=&reserve=&battery= — heuristic EV charging plan.
+  app.get<{
+    Params: { id: string };
+    Querystring: { rangeKm?: string; reserve?: string; battery?: string };
+  }>('/trips/:id/charge-plan', async (req, reply) => {
+    const trip = await store.getTrip(req.params.id);
+    if (!trip) return reply.code(404).send({ error: 'trip not found' });
+    const rangeKm = Number(req.query.rangeKm) || 300;
+    const reserve = Number(req.query.reserve) || 15;
+    const battery = Number(req.query.battery);
+    const startBatteryPct = Number.isFinite(battery) ? battery : trip.batteryEst;
+    return planCharging(trip, { rangeKm, reservePct: reserve, startBatteryPct });
+  });
 }

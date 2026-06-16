@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import 'leaflet/dist/leaflet.css';
   import { API_URL, TRIP_ID } from '$lib/config';
-  import type { Charger, DeviceSummary, FeedEntry, GeoPoint, Telemetry, Trip, TripStatus } from '$lib/types';
+  import type { Charger, ChargePlan, DeviceSummary, FeedEntry, GeoPoint, Telemetry, Trip, TripStatus } from '$lib/types';
 
   let activeTripId = $state(TRIP_ID);
   let trip = $state<Trip | null>(null);
@@ -19,12 +19,14 @@
   let createError = $state('');
   let created = $state<{ id: string; status: string } | null>(null);
   let chargers = $state<Charger[]>([]);
+  let chargePlan = $state<ChargePlan | null>(null);
 
   let mapEl: HTMLDivElement;
   let map: import('leaflet').Map | undefined;
   let marker: import('leaflet').CircleMarker | undefined;
   let routeLine: import('leaflet').Polyline | undefined;
   let chargerLayer: import('leaflet').LayerGroup | undefined;
+  let stopMarker: import('leaflet').CircleMarker | undefined;
   let L: typeof import('leaflet') | undefined;
   let socket: import('socket.io-client').Socket | undefined;
 
@@ -155,6 +157,40 @@
         )
         .addTo(chargerLayer);
     }
+  }
+
+  async function planCharge() {
+    const battery = telemetry?.battery ?? trip?.batteryEst;
+    try {
+      const qs = battery != null ? `?battery=${battery}` : '';
+      const res = await fetch(`${API_URL}/trips/${activeTripId}/charge-plan${qs}`);
+      if (!res.ok) return;
+      chargePlan = (await res.json()) as ChargePlan;
+      renderStop();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function renderStop() {
+    if (!map || !L) return;
+    stopMarker?.remove();
+    stopMarker = undefined;
+    const stop = chargePlan?.stop;
+    if (!stop) return;
+    stopMarker = L.circleMarker([stop.point.lat, stop.point.lng], {
+      radius: 12,
+      color: '#ffcc33',
+      fillColor: 'transparent',
+      weight: 3,
+    }).addTo(map);
+    const c = stop.charger;
+    stopMarker
+      .bindPopup(
+        `<b>Ricarica consigliata</b><br/>~${stop.atKm} km · batteria ~${stop.batteryAtStopPct}%` +
+          (c ? `<br/>${c.name} · ${c.powerKW ?? '?'} kW` : '<br/>nessuna colonnina trovata qui'),
+      )
+      .openPopup();
   }
 
   function pushFeed(type: string, detail: string) {
@@ -332,7 +368,21 @@
 
       <section class="card">
         <h2>Chargers</h2>
-        <button class="primary" onclick={findChargers}>Find nearby charger</button>
+        <div class="controls">
+          <button class="primary" onclick={findChargers}>Find nearby</button>
+          <button class="primary" onclick={planCharge}>Plan charging</button>
+        </div>
+        {#if chargePlan}
+          {#if chargePlan.needsCharge && chargePlan.stop}
+            <p class="warn note">
+              ⚡ Ricarica a ~{chargePlan.stop.atKm} km — {chargePlan.stop.charger?.name ?? 'colonnina'}
+              ({chargePlan.stop.charger?.powerKW ?? '?'}kW). Senza sosta arrivi ~{chargePlan.batteryAtArrivalPct}%.
+            </p>
+          {:else}
+            <p class="ok note">✓ Arrivi con ~{chargePlan.batteryAtArrivalPct}% — nessuna ricarica necessaria ({chargePlan.totalKm} km).</p>
+          {/if}
+          <p class="muted note">Stima lineare (range {chargePlan.rangeKm} km, riserva {chargePlan.reservePct}%) — non un calcolo EV reale.</p>
+        {/if}
         {#if chargers.length}
           <div class="chargers">
             {#each chargers.slice(0, 5) as c (c.id)}
@@ -596,6 +646,10 @@
   .note {
     margin: 8px 0 0;
     font-size: 11px;
+  }
+  .warn {
+    color: #e0c257;
+    font-size: 12px;
   }
   @media (max-width: 720px) {
     main {
