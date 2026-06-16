@@ -22,6 +22,7 @@
   let chargePlan = $state<ChargePlan | null>(null);
   let vehicles = $state<Vehicle[]>([]);
   let selectedModel = $state('');
+  let chargerNote = $state('');
 
   let mapEl: HTMLDivElement;
   let map: import('leaflet').Map | undefined;
@@ -125,21 +126,32 @@
   }
 
   async function findChargers() {
-    const center = telemetry?.gps ?? trip?.end ?? null;
-    if (!center) return;
+    // Prefer live position → trip end → trip start → wherever the map looks.
+    const c0 = map ? map.getCenter() : null;
+    const center =
+      telemetry?.gps ?? trip?.end ?? trip?.start ?? (c0 ? { lat: c0.lat, lng: c0.lng } : null);
+    if (!center) {
+      chargerNote = 'Mappa non pronta — riprova tra un attimo.';
+      return;
+    }
+    chargerNote = 'Cerco colonnine…';
     try {
       const res = await fetch(`${API_URL}/chargers?lat=${center.lat}&lng=${center.lng}&radius=15&max=12`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        chargerNote = `Errore ricerca (HTTP ${res.status}).`;
+        return;
+      }
       const data = (await res.json()) as { chargers: Charger[] };
       chargers = data.chargers ?? [];
       renderChargers();
+      chargerNote = chargers.length ? '' : 'Nessuna colonnina entro 15 km da qui.';
       if (chargers.length && map) {
         const pts = chargers.map((c) => [c.lat, c.lng] as [number, number]);
         pts.push([center.lat, center.lng]);
         map.fitBounds(pts, { padding: [40, 40], maxZoom: 13 });
       }
-    } catch {
-      /* provider unavailable — degrade silently */
+    } catch (e) {
+      chargerNote = `Provider non raggiungibile: ${e instanceof Error ? e.message : String(e)}`;
     }
   }
 
@@ -409,6 +421,9 @@
           <button class="primary" onclick={findChargers}>Find nearby</button>
           <button class="primary" onclick={planCharge}>Plan charging</button>
         </div>
+        {#if chargerNote}
+          <p class="muted note">{chargerNote}</p>
+        {/if}
         {#if chargePlan}
           {#if chargePlan.vehicle}
             <p class="muted note">
