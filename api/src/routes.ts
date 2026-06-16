@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { GeoPoint, TripStatus } from '../../agents/src/types';
+import { findChargers } from './chargers';
 import { classifyIntent } from './llm/intent';
 
 const TRIP_STATUSES: TripStatus[] = ['running', 'paused', 'redirected', 'completed'];
@@ -113,4 +114,32 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     const events = await store.listEvents(tripId);
     return { tripId, count: events.length, events };
   });
+
+  // GET /chargers?lat=&lng=&radius=&max= — nearby EV chargers (OpenChargeMap).
+  app.get<{ Querystring: { lat?: string; lng?: string; radius?: string; max?: string } }>(
+    '/chargers',
+    async (req, reply) => {
+      const lat = Number(req.query.lat);
+      const lng = Number(req.query.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return reply.code(400).send({ error: 'lat and lng are required numbers' });
+      }
+      const radius = Number(req.query.radius) || 10;
+      const max = Math.min(Number(req.query.max) || 15, 50);
+      try {
+        const chargers = await findChargers(lat, lng, radius, max);
+        const hint =
+          chargers.length === 0 && !process.env.OPENCHARGEMAP_API_KEY
+            ? 'no results — register a free OPENCHARGEMAP_API_KEY (openchargemap.org); anonymous requests are blocked'
+            : undefined;
+        return { count: chargers.length, chargers, source: 'openchargemap', ...(hint ? { hint } : {}) };
+      } catch (err) {
+        req.log.error({ err }, 'charger lookup failed');
+        const warning = !process.env.OPENCHARGEMAP_API_KEY
+          ? 'set OPENCHARGEMAP_API_KEY (free, openchargemap.org) — anonymous requests are blocked'
+          : 'charger provider unavailable';
+        return reply.send({ count: 0, chargers: [], source: 'openchargemap', warning });
+      }
+    },
+  );
 }

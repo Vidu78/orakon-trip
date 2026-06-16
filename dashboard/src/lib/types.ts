@@ -35,3 +35,15 @@ export interface FeedEntry {
   detail: string;
   ts: string;
 }
+
+export interface Charger {
+  id: string | number;
+  name: string;
+  lat: number;
+  lng: number;
+  distanceKm: number | null;
+  powerKW: number | null;
+  status: 'operational' | 'non-operational' | 'unknown';
+  cost: string | null;
+  town: string | null;
+}

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import 'leaflet/dist/leaflet.css';
   import { API_URL, TRIP_ID } from '$lib/config';
-  import type { DeviceSummary, FeedEntry, GeoPoint, Telemetry, Trip, TripStatus } from '$lib/types';
+  import type { Charger, DeviceSummary, FeedEntry, GeoPoint, Telemetry, Trip, TripStatus } from '$lib/types';
 
   let activeTripId = $state(TRIP_ID);
   let trip = $state<Trip | null>(null);
@@ -18,11 +18,13 @@
   let creating = $state(false);
   let createError = $state('');
   let created = $state<{ id: string; status: string } | null>(null);
+  let chargers = $state<Charger[]>([]);
 
   let mapEl: HTMLDivElement;
   let map: import('leaflet').Map | undefined;
   let marker: import('leaflet').CircleMarker | undefined;
   let routeLine: import('leaflet').Polyline | undefined;
+  let chargerLayer: import('leaflet').LayerGroup | undefined;
   let L: typeof import('leaflet') | undefined;
   let socket: import('socket.io-client').Socket | undefined;
 
@@ -118,6 +120,43 @@
     });
   }
 
+  async function findChargers() {
+    const center = telemetry?.gps ?? trip?.end ?? null;
+    if (!center) return;
+    try {
+      const res = await fetch(`${API_URL}/chargers?lat=${center.lat}&lng=${center.lng}&radius=15&max=12`);
+      if (!res.ok) return;
+      const data = (await res.json()) as { chargers: Charger[] };
+      chargers = data.chargers ?? [];
+      renderChargers();
+    } catch {
+      /* provider unavailable — degrade silently */
+    }
+  }
+
+  function renderChargers() {
+    if (!map || !L) return;
+    if (!chargerLayer) chargerLayer = L.layerGroup().addTo(map);
+    chargerLayer.clearLayers();
+    for (const c of chargers) {
+      const color =
+        c.status === 'operational' ? '#57e08a' : c.status === 'non-operational' ? '#ff7a90' : '#8a96b3';
+      L.circleMarker([c.lat, c.lng], {
+        radius: 7,
+        color,
+        fillColor: color,
+        fillOpacity: 0.9,
+        weight: 2,
+      })
+        .bindPopup(
+          `<b>${c.name}</b><br/>${c.powerKW ?? '?'} kW · ${c.status}` +
+            (c.distanceKm != null ? `<br/>${c.distanceKm.toFixed(1)} km` : '') +
+            (c.cost ? `<br/>${c.cost}` : ''),
+        )
+        .addTo(chargerLayer);
+    }
+  }
+
   function pushFeed(type: string, detail: string) {
     feed = [{ type, detail, ts: new Date().toISOString() }, ...feed].slice(0, 25);
   }
@@ -197,9 +236,10 @@
       });
       socket.on('telemetry', ({ telemetry: t }: { telemetry: Telemetry }) => updateTelemetry(t));
       socket.on('devices:update', (d: DeviceSummary[]) => (devices = d));
-      socket.on('intent:suggestion', (s: { action: string; reason: string }) =>
-        pushFeed('intent', `${s.action} — ${s.reason}`),
-      );
+      socket.on('intent:suggestion', (s: { action: string; reason: string }) => {
+        pushFeed('intent', `${s.action} — ${s.reason}`);
+        if (s.action === 'charger') findChargers();
+      });
       socket.on('device:action', (a: { action: string; intent?: string }) =>
         pushFeed('action', `${a.action}${a.intent ? ` (${a.intent})` : ''}`),
       );
@@ -288,6 +328,23 @@
           <button onclick={() => control('running')}>Resume</button>
           <button onclick={() => control('redirected')}>Redirect</button>
         </div>
+      </section>
+
+      <section class="card">
+        <h2>Chargers</h2>
+        <button class="primary" onclick={findChargers}>Find nearby charger</button>
+        {#if chargers.length}
+          <div class="chargers">
+            {#each chargers.slice(0, 5) as c (c.id)}
+              <div class="charger">
+                <span class="dot {c.status}"></span>
+                <span class="cname">{c.name}</span>
+                <span class="cmeta">{c.powerKW ?? '?'}kW{c.distanceKm != null ? ` · ${c.distanceKm.toFixed(1)}km` : ''}</span>
+              </div>
+            {/each}
+          </div>
+          <p class="muted note">Fonte: OpenChargeMap (stato operativo, non disponibilità live)</p>
+        {/if}
       </section>
 
       <section class="card">
@@ -507,6 +564,38 @@
   }
   .muted {
     color: #6b7796;
+  }
+  .chargers {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .charger {
+    display: grid;
+    grid-template-columns: 12px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+  }
+  .charger .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #8a96b3;
+  }
+  .charger .dot.operational {
+    background: #57e08a;
+  }
+  .charger .dot.non-operational {
+    background: #ff7a90;
+  }
+  .cmeta {
+    color: #8a96b3;
+  }
+  .note {
+    margin: 8px 0 0;
+    font-size: 11px;
   }
   @media (max-width: 720px) {
     main {

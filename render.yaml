@@ -29,3 +29,6 @@ services:
       # Optional — set to a Postgres/Supabase URL to persist; blank = in-memory:
       - key: DATABASE_URL
         sync: false
+      # Free key from openchargemap.org — REQUIRED for /chargers results (anonymous = 403):
+      - key: OPENCHARGEMAP_API_KEY
+        sync: false
