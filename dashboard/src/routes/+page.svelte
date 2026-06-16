@@ -111,6 +111,7 @@
         const data = (await res.json()) as { trip: Trip };
         trip = data.trip;
         drawRoute();
+        findChargers(false); // auto-show chargers, but keep the route in view
       }
     } catch {
       /* live channel will fill in */
@@ -125,7 +126,7 @@
     });
   }
 
-  async function findChargers() {
+  async function findChargers(fit = true) {
     // Prefer live position → trip end → trip start → wherever the map looks.
     const c0 = map ? map.getCenter() : null;
     const center =
@@ -145,7 +146,7 @@
       chargers = data.chargers ?? [];
       renderChargers();
       chargerNote = chargers.length ? '' : 'Nessuna colonnina entro 15 km da qui.';
-      if (chargers.length && map) {
+      if (fit && chargers.length && map) {
         const pts = chargers.map((c) => [c.lat, c.lng] as [number, number]);
         pts.push([center.lat, center.lng]);
         map.fitBounds(pts, { padding: [40, 40], maxZoom: 13 });
@@ -418,7 +419,7 @@
           </select>
         </label>
         <div class="controls">
-          <button class="primary" onclick={findChargers}>Find nearby</button>
+          <button class="primary" onclick={() => findChargers(true)}>Find nearby</button>
           <button class="primary" onclick={planCharge}>Plan charging</button>
         </div>
         {#if chargerNote}
