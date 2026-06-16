@@ -32,3 +32,6 @@ services:
       # Free key from openchargemap.org — REQUIRED for /chargers results (anonymous = 403):
       - key: OPENCHARGEMAP_API_KEY
         sync: false
+      # Routing engine for real road geometry on POST /trips (default: public OSRM demo):
+      - key: OSRM_URL
+        value: https://router.project-osrm.org

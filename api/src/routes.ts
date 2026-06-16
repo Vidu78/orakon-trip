@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { GeoPoint, TripStatus } from '../../agents/src/types';
 import { findChargers } from './chargers';
 import { classifyIntent } from './llm/intent';
+import { roadRoute } from './routing';
 
 const TRIP_STATUSES: TripStatus[] = ['running', 'paused', 'redirected', 'completed'];
 const DEVICE_TYPES = ['car', 'watch', 'laptop'] as const;
@@ -37,11 +38,15 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     if (!body.start || !body.end) {
       return reply.code(400).send({ error: 'start and end are required' });
     }
+    // Snap to the real road network (OSRM); fall back to the provided route
+    // (or a straight start→end line) if routing is unavailable.
+    const waypoints = body.route && body.route.length >= 2 ? body.route : [body.start, body.end];
+    const road = await roadRoute(waypoints);
     const trip = await store.createTrip({
       id: body.id,
       start: body.start,
       end: body.end,
-      route: body.route,
+      route: road ?? body.route,
       batteryEst: body.batteryEst,
     });
     await store.appendEvent({ tripId: trip.id, type: 'trip.created', payload: { trip } });
