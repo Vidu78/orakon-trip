@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import 'leaflet/dist/leaflet.css';
   import { API_URL, TRIP_ID } from '$lib/config';
-  import type { Charger, ChargePlan, DeviceSummary, FeedEntry, GeoPoint, Telemetry, Trip, TripStatus } from '$lib/types';
+  import type { Charger, ChargePlan, DeviceSummary, FeedEntry, GeoPoint, Telemetry, Trip, TripStatus, Vehicle } from '$lib/types';
 
   let activeTripId = $state(TRIP_ID);
   let trip = $state<Trip | null>(null);
@@ -20,6 +20,8 @@
   let created = $state<{ id: string; status: string } | null>(null);
   let chargers = $state<Charger[]>([]);
   let chargePlan = $state<ChargePlan | null>(null);
+  let vehicles = $state<Vehicle[]>([]);
+  let selectedModel = $state('');
 
   let mapEl: HTMLDivElement;
   let map: import('leaflet').Map | undefined;
@@ -159,11 +161,25 @@
     }
   }
 
+  async function loadVehicles() {
+    try {
+      const res = await fetch(`${API_URL}/vehicles`);
+      if (!res.ok) return;
+      const data = (await res.json()) as { vehicles: Vehicle[] };
+      vehicles = data.vehicles ?? [];
+    } catch {
+      /* optional — plan works with default range */
+    }
+  }
+
   async function planCharge() {
     const battery = telemetry?.battery ?? trip?.batteryEst;
     try {
-      const qs = battery != null ? `?battery=${battery}` : '';
-      const res = await fetch(`${API_URL}/trips/${activeTripId}/charge-plan${qs}`);
+      const params = new URLSearchParams();
+      if (battery != null) params.set('battery', String(battery));
+      if (selectedModel) params.set('model', selectedModel);
+      const qs = params.toString();
+      const res = await fetch(`${API_URL}/trips/${activeTripId}/charge-plan${qs ? `?${qs}` : ''}`);
       if (!res.ok) return;
       chargePlan = (await res.json()) as ChargePlan;
       renderStop();
@@ -245,6 +261,7 @@
       }).addTo(map);
 
       await loadTrip(activeTripId);
+      loadVehicles();
 
       const { io } = await import('socket.io-client');
       socket = io(API_URL, { transports: ['websocket', 'polling'] });
@@ -368,11 +385,25 @@
 
       <section class="card">
         <h2>Chargers</h2>
+        <label>Veicolo (consumo reale)
+          <select bind:value={selectedModel}>
+            <option value="">Generico (~300 km)</option>
+            {#each vehicles as v (v.id)}
+              <option value={v.id}>{v.name}</option>
+            {/each}
+          </select>
+        </label>
         <div class="controls">
           <button class="primary" onclick={findChargers}>Find nearby</button>
           <button class="primary" onclick={planCharge}>Plan charging</button>
         </div>
         {#if chargePlan}
+          {#if chargePlan.vehicle}
+            <p class="muted note">
+              {chargePlan.vehicle.name}: autonomia reale ~{chargePlan.rangeKm} km
+              (WLTP {chargePlan.vehicle.wltpRangeKm} km · {chargePlan.vehicle.consumptionWhKm} Wh/km · ×{chargePlan.vehicle.realWorldFactor}).
+            </p>
+          {/if}
           {#if chargePlan.needsCharge && chargePlan.stop}
             <p class="warn note">
               ⚡ Ricarica a ~{chargePlan.stop.atKm} km — {chargePlan.stop.charger?.name ?? 'colonnina'}
@@ -513,7 +544,8 @@
     color: #8a96b3;
     margin-bottom: 8px;
   }
-  input {
+  input,
+  select {
     width: 100%;
     box-sizing: border-box;
     margin-top: 4px;

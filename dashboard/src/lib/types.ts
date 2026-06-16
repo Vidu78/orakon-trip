@@ -48,6 +48,23 @@ export interface Charger {
   town: string | null;
 }
 
+export interface Vehicle {
+  id: string;
+  name: string;
+  type: 'car' | 'van';
+  batteryKwh: number;
+  consumptionWhKm: number;
+}
+
+export interface VehicleMeta {
+  id: string;
+  name: string;
+  batteryKwh: number;
+  consumptionWhKm: number;
+  wltpRangeKm: number;
+  realWorldFactor: number;
+}
+
 export interface ChargePlan {
   needsCharge: boolean;
   rangeKm: number;
@@ -55,6 +72,7 @@ export interface ChargePlan {
   startBatteryPct: number;
   totalKm: number;
   batteryAtArrivalPct: number;
+  vehicle: VehicleMeta | null;
   stop: null | {
     atKm: number;
     point: { lat: number; lng: number };

@@ -8,6 +8,15 @@ import { type Charger, findChargers } from './chargers';
  * distance, from an assumed full-charge range). It ignores elevation, speed,
  * weather and the specific vehicle. It's a useful estimate, not a guarantee.
  */
+export interface VehicleMeta {
+  id: string;
+  name: string;
+  batteryKwh: number;
+  consumptionWhKm: number;
+  wltpRangeKm: number;
+  realWorldFactor: number;
+}
+
 export interface ChargePlan {
   needsCharge: boolean;
   rangeKm: number;
@@ -15,6 +24,7 @@ export interface ChargePlan {
   startBatteryPct: number;
   totalKm: number;
   batteryAtArrivalPct: number;
+  vehicle: VehicleMeta | null;
   stop: null | {
     atKm: number;
     point: GeoPoint;
@@ -26,9 +36,10 @@ export interface ChargePlan {
 
 export async function planCharging(
   trip: Trip,
-  opts: { rangeKm: number; reservePct: number; startBatteryPct: number },
+  opts: { rangeKm: number; reservePct: number; startBatteryPct: number; vehicle?: VehicleMeta | null },
 ): Promise<ChargePlan> {
   const { rangeKm, reservePct, startBatteryPct } = opts;
+  const vehicle = opts.vehicle ?? null;
   const route = trip.route && trip.route.length >= 2 ? trip.route : [trip.start, trip.end];
 
   // Cumulative distance (km) at each route point.
@@ -46,6 +57,7 @@ export async function planCharging(
     startBatteryPct,
     totalKm: round(totalKm),
     batteryAtArrivalPct: round(batteryAtArrivalPct),
+    vehicle,
   };
 
   // Enough charge to arrive above the reserve → no stop needed.

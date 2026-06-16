@@ -4,6 +4,7 @@ import { planCharging } from './chargePlan';
 import { findChargers } from './chargers';
 import { classifyIntent } from './llm/intent';
 import { roadRoute } from './routing';
+import { DEFAULT_REALWORLD_FACTOR, getVehicle, listVehicles, wltpRangeKm, realRangeKm } from './vehicles';
 
 const TRIP_STATUSES: TripStatus[] = ['running', 'paused', 'redirected', 'completed'];
 const DEVICE_TYPES = ['car', 'watch', 'laptop'] as const;
@@ -149,17 +150,44 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // GET /trips/:id/charge-plan?rangeKm=&reserve=&battery= — heuristic EV charging plan.
+  // GET /vehicles — EV model catalog (real battery + WLTP consumption).
+  app.get('/vehicles', async () => {
+    const vehicles = listVehicles();
+    return { count: vehicles.length, vehicles };
+  });
+
+  // GET /trips/:id/charge-plan?model=&factor=&rangeKm=&reserve=&battery=
+  // Range comes from the chosen vehicle model (real battery/consumption,
+  // derated by factor) unless an explicit rangeKm is given.
   app.get<{
     Params: { id: string };
-    Querystring: { rangeKm?: string; reserve?: string; battery?: string };
+    Querystring: { model?: string; factor?: string; rangeKm?: string; reserve?: string; battery?: string };
   }>('/trips/:id/charge-plan', async (req, reply) => {
     const trip = await store.getTrip(req.params.id);
     if (!trip) return reply.code(404).send({ error: 'trip not found' });
-    const rangeKm = Number(req.query.rangeKm) || 300;
+
     const reserve = Number(req.query.reserve) || 15;
     const battery = Number(req.query.battery);
     const startBatteryPct = Number.isFinite(battery) ? battery : trip.batteryEst;
-    return planCharging(trip, { rangeKm, reservePct: reserve, startBatteryPct });
+    const factor = Number(req.query.factor) || DEFAULT_REALWORLD_FACTOR;
+
+    const explicit = Number(req.query.rangeKm);
+    const v = req.query.model ? getVehicle(req.query.model) : undefined;
+    let rangeKm = 300;
+    let vehicle = null;
+    if (Number.isFinite(explicit) && explicit > 0) {
+      rangeKm = explicit;
+    } else if (v) {
+      rangeKm = Math.round(realRangeKm(v, factor));
+      vehicle = {
+        id: v.id,
+        name: v.name,
+        batteryKwh: v.batteryKwh,
+        consumptionWhKm: v.consumptionWhKm,
+        wltpRangeKm: Math.round(wltpRangeKm(v)),
+        realWorldFactor: factor,
+      };
+    }
+    return planCharging(trip, { rangeKm, reservePct: reserve, startBatteryPct, vehicle });
   });
 }
