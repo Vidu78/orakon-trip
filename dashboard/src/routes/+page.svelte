@@ -133,6 +133,11 @@
       const data = (await res.json()) as { chargers: Charger[] };
       chargers = data.chargers ?? [];
       renderChargers();
+      if (chargers.length && map) {
+        const pts = chargers.map((c) => [c.lat, c.lng] as [number, number]);
+        pts.push([center.lat, center.lng]);
+        map.fitBounds(pts, { padding: [40, 40], maxZoom: 13 });
+      }
     } catch {
       /* provider unavailable — degrade silently */
     }
@@ -182,6 +187,13 @@
       const res = await fetch(`${API_URL}/trips/${activeTripId}/charge-plan${qs ? `?${qs}` : ''}`);
       if (!res.ok) return;
       chargePlan = (await res.json()) as ChargePlan;
+      const stop = chargePlan.stop;
+      if (stop) {
+        // Show the candidate chargers near the suggested stop, not just the ring.
+        chargers = stop.alternatives?.length ? stop.alternatives : stop.charger ? [stop.charger] : [];
+        renderChargers();
+        map?.setView([stop.point.lat, stop.point.lng], 11);
+      }
       renderStop();
     } catch {
       /* ignore */
