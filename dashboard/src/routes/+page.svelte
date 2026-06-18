@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import 'leaflet/dist/leaflet.css';
   import { API_URL, TRIP_ID } from '$lib/config';
-  import type { Charger, ChargePlan, DeviceSummary, FeedEntry, GeoPoint, Telemetry, Trip, TripStatus, Vehicle } from '$lib/types';
+  import type { Charger, DeviceSummary, FeedEntry, GeoPoint, Telemetry, Trip, TripStatus, Vehicle } from '$lib/types';
   import { nearbyChargers, pointsInBounds } from '$lib/chargingData';
 
   let activeTripId = $state(TRIP_ID);
@@ -20,7 +20,9 @@
   let createError = $state('');
   let created = $state<{ id: string; status: string } | null>(null);
   let chargers = $state<Charger[]>([]);
-  let chargePlan = $state<ChargePlan | null>(null);
+  type PlanStop = { atKm: number; point: GeoPoint; charger: Charger | null; alternatives: Charger[] };
+  type TripPlan = { needsCharge: boolean; stops: PlanStop[]; arrivalPct: number; totalKm: number; rangeKm: number };
+  let tripPlan = $state<TripPlan | null>(null);
   let vehicles = $state<Vehicle[]>([]);
   let selectedModel = $state('');
   let chargerNote = $state('');
@@ -37,7 +39,7 @@
   let routeLine: import('leaflet').Polyline | undefined;
   let chargerLayer: import('leaflet').LayerGroup | undefined;
   let networkLayer: import('leaflet').LayerGroup | undefined;
-  let stopMarker: import('leaflet').CircleMarker | undefined;
+  let stopLayer: import('leaflet').LayerGroup | undefined;
   let L: typeof import('leaflet') | undefined;
   let socket: import('socket.io-client').Socket | undefined;
 
@@ -275,69 +277,56 @@
 
   // Plan the charge stop client-side against the static 142k network, so it
   // works regardless of the live backend (which often returns no charger).
+  // Multi-stop charge plan along the route: add a stop whenever the battery
+  // would reach the reserve, assume a top-up to ~80%, repeat until arrival.
   async function planCharge() {
     if (!trip) return;
     const route = trip.route && trip.route.length > 1 ? trip.route : [trip.start, trip.end];
     const cum = cumulative(route);
     const total = cum[cum.length - 1];
-
-    const battery = telemetry?.battery ?? trip.batteryEst ?? 80;
     const range = vehicleRangeKm();
     const reservePct = 10;
+    const targetPct = 80; // recharge back up to this at each stop
 
-    // Distance already driven (from live/sim position) and what remains.
-    const coveredKm = telemetry?.gps ? Math.max(0, total - remainingRouteKm(telemetry.gps, route, trip.end)) : 0;
-    const remainKm = total - coveredKm;
-    const arrivalPct = Math.round(battery - (remainKm / range) * 100);
-    const usableKm = (range * (battery - reservePct)) / 100; // km before hitting reserve
-    const needsCharge = usableKm < remainKm;
+    let battery = telemetry?.battery ?? trip.batteryEst ?? 80;
+    let posKm = telemetry?.gps ? Math.max(0, total - remainingRouteKm(telemetry.gps, route, trip.end)) : 0;
 
-    let stop: ChargePlan['stop'] = null;
-    if (needsCharge) {
-      const stopKm = Math.min(total, coveredKm + Math.max(0, usableKm));
+    const stops: PlanStop[] = [];
+    for (let guard = 0; guard < 12 && stops.length < 6; guard++) {
+      const reachableKm = posKm + (range * (battery - reservePct)) / 100;
+      if (reachableKm >= total) break; // can finish without another stop
+      const stopKm = Math.max(posKm, Math.min(total, reachableKm));
       const point = interpAlong(route, cum, stopKm);
-      const near = await nearbyChargers(point.lat, point.lng, 40, 6);
-      stop = { atKm: Math.round(stopKm), point, batteryAtStopPct: reservePct, charger: near[0] ?? null, alternatives: near };
-      chargers = near;
-      renderChargers();
-      map?.setView([point.lat, point.lng], 11);
-    } else {
-      stopMarker?.remove();
-      stopMarker = undefined;
+      const near = await nearbyChargers(point.lat, point.lng, 40, 5);
+      stops.push({ atKm: Math.round(stopKm), point, charger: near[0] ?? null, alternatives: near });
+      posKm = stopKm;
+      battery = targetPct;
     }
+    const arrivalPct = Math.round(battery - ((total - posKm) / range) * 100);
+    tripPlan = { needsCharge: stops.length > 0, stops, arrivalPct, totalKm: Math.round(total), rangeKm: Math.round(range) };
 
-    chargePlan = {
-      needsCharge,
-      rangeKm: Math.round(range),
-      reservePct,
-      startBatteryPct: Math.round(battery),
-      totalKm: Math.round(total),
-      batteryAtArrivalPct: arrivalPct,
-      vehicle: null,
-      stop,
-    };
-    renderStop();
+    chargers = stops.flatMap((s) => s.alternatives).slice(0, 8);
+    renderChargers();
+    renderStops();
+    if (stops[0]) map?.setView([stops[0].point.lat, stops[0].point.lng], 9);
   }
 
-  function renderStop() {
+  function renderStops() {
     if (!map || !L) return;
-    stopMarker?.remove();
-    stopMarker = undefined;
-    const stop = chargePlan?.stop;
-    if (!stop) return;
-    stopMarker = L.circleMarker([stop.point.lat, stop.point.lng], {
-      radius: 12,
-      color: '#ffcc33',
-      fillColor: 'transparent',
-      weight: 3,
-    }).addTo(map);
-    const c = stop.charger;
-    stopMarker
-      .bindPopup(
-        `<b>Ricarica consigliata</b><br/>~${stop.atKm} km · batteria ~${stop.batteryAtStopPct}%` +
-          (c ? `<br/>${c.name} · ${c.powerKW ?? '?'} kW` : '<br/>nessuna colonnina trovata qui'),
-      )
-      .openPopup();
+    const LL = L;
+    if (!stopLayer) stopLayer = LL.layerGroup().addTo(map);
+    const layer = stopLayer;
+    layer.clearLayers();
+    (tripPlan?.stops ?? []).forEach((s, i) => {
+      const c = s.charger;
+      const m = LL.circleMarker([s.point.lat, s.point.lng], { radius: 12, color: '#ffcc33', fillColor: 'transparent', weight: 3 })
+        .bindPopup(
+          `<b>Sosta ${i + 1} · ~${s.atKm} km</b>` +
+            (c ? `<br/>${c.name} · ${c.powerKW ?? '?'} kW` : '<br/>nessuna colonnina trovata qui'),
+        )
+        .addTo(layer);
+      if (i === 0) m.openPopup();
+    });
   }
 
   function pushFeed(type: string, detail: string) {
@@ -639,27 +628,26 @@
         {#if chargerNote}
           <p class="muted note">{chargerNote}</p>
         {/if}
-        {#if chargePlan}
-          {#if chargePlan.vehicle}
-            <p class="muted note">
-              {chargePlan.vehicle.name}: autonomia reale ~{chargePlan.rangeKm} km
-              (WLTP {chargePlan.vehicle.wltpRangeKm} km · {chargePlan.vehicle.consumptionWhKm} Wh/km · ×{chargePlan.vehicle.realWorldFactor}).
-            </p>
-          {/if}
-          {#if chargePlan.needsCharge && chargePlan.stop}
+        {#if tripPlan}
+          {#if tripPlan.needsCharge}
             <p class="warn note">
-              ⚡ Ricarica consigliata a ~{chargePlan.stop.atKm} km
-              {#if chargePlan.stop.charger}— {chargePlan.stop.charger.name} ({chargePlan.stop.charger.powerKW ?? '?'} kW){/if}.
-              {#if chargePlan.batteryAtArrivalPct >= 0}
-                Senza sosta arriveresti a ~{chargePlan.batteryAtArrivalPct}%.
-              {:else}
-                Senza ricarica <b>non arrivi</b> a destinazione.
-              {/if}
+              ⚡ {tripPlan.stops.length}
+              {tripPlan.stops.length === 1 ? 'sosta di ricarica consigliata' : 'soste di ricarica consigliate'}
+              · arrivo stimato ~{tripPlan.arrivalPct}%.
             </p>
+            <div class="chargers">
+              {#each tripPlan.stops as s, i (s.atKm)}
+                <div class="charger">
+                  <span class="dot operational"></span>
+                  <span class="cname">Sosta {i + 1} · ~{s.atKm} km — {s.charger?.name ?? 'colonnina non trovata'}</span>
+                  <span class="cmeta">{s.charger?.powerKW ?? '?'}kW</span>
+                </div>
+              {/each}
+            </div>
           {:else}
-            <p class="ok note">✓ Arrivi con ~{chargePlan.batteryAtArrivalPct}% — nessuna ricarica necessaria ({chargePlan.totalKm} km).</p>
+            <p class="ok note">✓ Arrivi con ~{tripPlan.arrivalPct}% — nessuna ricarica necessaria ({tripPlan.totalKm} km).</p>
           {/if}
-          <p class="muted note">Stima lineare (range {chargePlan.rangeKm} km, riserva {chargePlan.reservePct}%) — non un calcolo EV reale.</p>
+          <p class="muted note">Stima lineare (autonomia {tripPlan.rangeKm} km, riserva 10%, ricarica all'80%) — non un calcolo EV reale.</p>
         {/if}
         {#if chargers.length}
           <div class="chargers">
