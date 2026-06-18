@@ -122,7 +122,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     return { tripId, count: events.length, events };
   });
 
-  // GET /chargers?lat=&lng=&radius=&max= — nearby EV chargers (OpenChargeMap).
+  // GET /chargers?lat=&lng=&radius=&max= — nearby EV chargers (Orakon live-pack, 142k OCM).
   app.get<{ Querystring: { lat?: string; lng?: string; radius?: string; max?: string } }>(
     '/chargers',
     async (req, reply) => {
@@ -135,17 +135,11 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       const max = Math.min(Number(req.query.max) || 15, 50);
       try {
         const chargers = await findChargers(lat, lng, radius, max);
-        const hint =
-          chargers.length === 0 && !process.env.OPENCHARGEMAP_API_KEY
-            ? 'no results — register a free OPENCHARGEMAP_API_KEY (openchargemap.org); anonymous requests are blocked'
-            : undefined;
-        return { count: chargers.length, chargers, source: 'openchargemap', ...(hint ? { hint } : {}) };
+        const hint = chargers.length === 0 ? `no chargers within ${radius} km` : undefined;
+        return { count: chargers.length, chargers, source: 'orakon-pack', ...(hint ? { hint } : {}) };
       } catch (err) {
         req.log.error({ err }, 'charger lookup failed');
-        const warning = !process.env.OPENCHARGEMAP_API_KEY
-          ? 'set OPENCHARGEMAP_API_KEY (free, openchargemap.org) — anonymous requests are blocked'
-          : 'charger provider unavailable';
-        return reply.send({ count: 0, chargers: [], source: 'openchargemap', warning });
+        return reply.send({ count: 0, chargers: [], source: 'orakon-pack', warning: 'charging dataset unavailable' });
       }
     },
   );

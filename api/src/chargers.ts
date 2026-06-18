@@ -1,13 +1,15 @@
 /**
- * Charger lookup via OpenChargeMap (free public API).
- * https://openchargemap.org/site/develop/api
+ * Charger lookup backed by the Orakon Trip live-pack CDN (142k OCM stations,
+ * Europe). We query our own pre-fetched dataset instead of hitting
+ * OpenChargeMap live: OCM sits behind Cloudflare and returns 403 to datacenter
+ * IPs (Render included), and the pack is complete, fast and not rate-limited.
  *
- * Note: OpenChargeMap exposes operational status + power, but NOT reliable
- * real-time "available/occupied" for most POIs. We surface the operational
- * status honestly rather than faking live availability.
+ * Note: the static dataset exposes power + identity but NOT live availability,
+ * so status is reported as 'unknown' rather than faking "available/occupied".
  */
 
-const OCM_URL = 'https://api.openchargemap.io/v3/poi';
+const DATA_URL =
+  process.env.CHARGING_DATA_URL || 'https://orakon-live-pack.vercel.app/data/overview.json';
 
 export interface Charger {
   id: string | number;
@@ -21,81 +23,70 @@ export interface Charger {
   town: string | null;
 }
 
-interface OcmPoi {
-  ID?: number;
-  AddressInfo?: {
-    ID?: number;
-    Title?: string;
-    AddressLine1?: string;
-    Town?: string;
-    Latitude?: number;
-    Longitude?: number;
-    Distance?: number;
-  };
-  Connections?: Array<{ PowerKW?: number }>;
-  StatusType?: { IsOperational?: boolean | null };
-  UsageCost?: string | null;
+// Compact overview rows: [id, lat, lng, power_kw, name].
+type Point = [number | string, number, number, number, string];
+
+let cache: Point[] | null = null;
+let loading: Promise<Point[]> | null = null;
+
+async function loadPoints(): Promise<Point[]> {
+  if (cache) return cache;
+  if (!loading) {
+    loading = fetch(DATA_URL, { signal: AbortSignal.timeout(20000) })
+      .then((r) => {
+        if (!r.ok) throw new Error(`charging data ${r.status}`);
+        return r.json() as Promise<{ points: Point[] }>;
+      })
+      .then((d) => {
+        cache = d.points ?? [];
+        return cache;
+      })
+      .catch((err) => {
+        loading = null; // allow retry on the next request
+        throw err;
+      });
+  }
+  return loading;
 }
 
-function normalize(poi: OcmPoi): Charger | null {
-  const a = poi.AddressInfo;
-  if (!a || typeof a.Latitude !== 'number' || typeof a.Longitude !== 'number') return null;
-
-  const conns = Array.isArray(poi.Connections) ? poi.Connections : [];
-  const powerKW = conns.reduce((max, c) => Math.max(max, Number(c?.PowerKW) || 0), 0) || null;
-
-  const op = poi.StatusType?.IsOperational;
-  const status: Charger['status'] =
-    op === true ? 'operational' : op === false ? 'non-operational' : 'unknown';
-
-  return {
-    id: poi.ID ?? a.ID ?? `${a.Latitude},${a.Longitude}`,
-    name: a.Title || a.AddressLine1 || 'Colonnina',
-    lat: a.Latitude,
-    lng: a.Longitude,
-    distanceKm: typeof a.Distance === 'number' ? a.Distance : null,
-    powerKW,
-    status,
-    cost: poi.UsageCost || null,
-    town: a.Town || null,
-  };
+function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371;
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
 }
 
-const statusRank = (s: Charger['status']) => (s === 'operational' ? 0 : s === 'unknown' ? 1 : 2);
-
-/** Nearest chargers around a point, sorted by operational → distance → power. */
+/** Nearest chargers around a point, sorted by distance then power. */
 export async function findChargers(
   lat: number,
   lng: number,
   radiusKm = 10,
   max = 15,
 ): Promise<Charger[]> {
-  const params = new URLSearchParams({
-    output: 'json',
-    latitude: String(lat),
-    longitude: String(lng),
-    distance: String(radiusKm),
-    distanceunit: 'KM',
-    maxresults: String(max),
-    compact: 'true',
-    verbose: 'false',
-  });
-  const key = process.env.OPENCHARGEMAP_API_KEY;
-  if (key) params.set('key', key);
-
-  const res = await fetch(`${OCM_URL}?${params.toString()}`, {
-    headers: key ? { 'X-API-Key': key } : {},
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!res.ok) throw new Error(`OpenChargeMap ${res.status}`);
-
-  const data = (await res.json()) as OcmPoi[];
-  const chargers = data.map(normalize).filter((c): c is Charger => c !== null);
-  chargers.sort(
-    (a, b) =>
-      statusRank(a.status) - statusRank(b.status) ||
-      (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9) ||
-      (b.powerKW ?? 0) - (a.powerKW ?? 0),
+  const points = await loadPoints();
+  const hits: Charger[] = [];
+  for (const p of points) {
+    const d = haversineKm(lat, lng, p[1], p[2]);
+    if (d <= radiusKm) {
+      hits.push({
+        id: p[0],
+        name: p[4] || `OCM #${p[0]}`,
+        lat: p[1],
+        lng: p[2],
+        distanceKm: Math.round(d * 10) / 10,
+        powerKW: p[3] || null,
+        status: 'unknown',
+        cost: null,
+        town: null,
+      });
+    }
+  }
+  hits.sort(
+    (a, b) => (a.distanceKm ?? 1e9) - (b.distanceKm ?? 1e9) || (b.powerKW ?? 0) - (a.powerKW ?? 0),
   );
-  return chargers;
+  return hits.slice(0, max);
 }
