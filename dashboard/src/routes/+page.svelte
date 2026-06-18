@@ -30,6 +30,7 @@
   // Static EV network layer (Orakon Trip live-pack: 142k OCM stations, Europe).
   let showNetwork = $state(false);
   let networkNote = $state('');
+  let netRenderTimer: ReturnType<typeof setTimeout> | undefined;
   const NETWORK_MIN_ZOOM = 8;
   const NETWORK_MAX_MARKERS = 2000;
 
@@ -463,7 +464,13 @@
       }).addTo(map);
 
       // Keep the static network layer in sync with the viewport when active.
-      map.on('moveend', () => { if (showNetwork) renderNetwork(); });
+      // Debounced so following a moving car (continuous panning) doesn't
+      // redraw the 2000-marker layer every frame (that caused the flicker).
+      map.on('moveend', () => {
+        if (!showNetwork) return;
+        clearTimeout(netRenderTimer);
+        netRenderTimer = setTimeout(() => renderNetwork(), 500);
+      });
 
       await loadTrip(activeTripId);
       loadVehicles();
