@@ -46,16 +46,15 @@ export class PostgresStore implements TripStore {
   async createTrip(input: CreateTripInput): Promise<Trip> {
     const id = input.id ?? randomUUID();
     const route = input.route?.length ? input.route : [input.start, input.end];
-    // ponytail: routeKm/routeMin not persisted here — derived from OSRM and cheap
-    // to recompute on next create; Postgres is unused in prod (in-memory). Add
-    // columns + map them if/when DB persistence of trips actually ships.
     const { rows } = await this.pool.query(
-      `insert into trips (id, start, "end", route, battery_est, status)
-       values ($1, $2, $3, $4, $5, 'running')
+      `insert into trips (id, start, "end", route, route_km, route_min, battery_est, status)
+       values ($1, $2, $3, $4, $5, $6, $7, 'running')
        on conflict (id) do update set
          start = excluded.start,
          "end" = excluded."end",
          route = excluded.route,
+         route_km = excluded.route_km,
+         route_min = excluded.route_min,
          battery_est = excluded.battery_est,
          updated_at = now()
        returning *`,
@@ -64,6 +63,8 @@ export class PostgresStore implements TripStore {
         JSON.stringify(input.start),
         JSON.stringify(input.end),
         JSON.stringify(route),
+        input.routeKm ?? null,
+        input.routeMin ?? null,
         input.batteryEst ?? 100,
       ],
     );
@@ -136,6 +137,8 @@ function mapTrip(r: Record<string, unknown>): Trip {
     start: r.start as Trip['start'],
     end: r.end as Trip['end'],
     route: (r.route as Trip['route']) ?? [],
+    routeKm: r.route_km == null ? undefined : Number(r.route_km),
+    routeMin: r.route_min == null ? undefined : Number(r.route_min),
     batteryEst: Number(r.battery_est),
     status: r.status as TripStatus,
     createdAt: new Date(r.created_at as string).toISOString(),

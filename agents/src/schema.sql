@@ -11,6 +11,10 @@ create table if not exists trips (
   updated_at   timestamptz  not null default now()
 );
 
+-- Real road distance/duration from OSRM (nullable; absent when routing failed).
+alter table trips add column if not exists route_km  integer;
+alter table trips add column if not exists route_min integer;
+
 create table if not exists devices (
   id            text primary key,
   type          text        not null,
