@@ -48,7 +48,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       id: body.id,
       start: body.start,
       end: body.end,
-      route: road ?? body.route,
+      route: road?.points ?? body.route,
+      routeKm: road?.km,
+      routeMin: road?.min,
       batteryEst: body.batteryEst,
     });
     await store.appendEvent({ tripId: trip.id, type: 'trip.created', payload: { trip } });

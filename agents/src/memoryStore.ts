@@ -25,6 +25,8 @@ export class InMemoryStore implements TripStore {
       start: input.start,
       end: input.end,
       route: input.route?.length ? input.route : [input.start, input.end],
+      routeKm: input.routeKm,
+      routeMin: input.routeMin,
       batteryEst: input.batteryEst ?? 100,
       status: 'running',
       createdAt: now,

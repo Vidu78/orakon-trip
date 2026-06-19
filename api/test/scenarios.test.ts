@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { FastifyInstance } from 'fastify';
+import { InMemoryStore } from '../../agents/src/memoryStore';
 import { buildServer } from '../src/server';
 
 /**
@@ -72,4 +73,22 @@ test('Orakon Trip MVP scenarios', async (t) => {
       'pause + resume both logged',
     );
   });
+});
+
+// OSRM gives real road distance/duration; routes.ts threads them onto the trip
+// so the dashboard's at-rest ETA uses real speed, not a flat 100 km/h.
+test('createTrip persists OSRM routeKm/routeMin', async () => {
+  const store = new InMemoryStore();
+  await store.init();
+  const trip = await store.createTrip({
+    start: { lat: 45.46, lng: 9.19 },
+    end: { lat: 41.9, lng: 12.5 },
+    routeKm: 575,
+    routeMin: 345,
+  });
+  const back = await store.getTrip(trip.id);
+  assert.equal(back?.routeKm, 575);
+  assert.equal(back?.routeMin, 345);
+  // avg speed the dashboard derives from these: ~100 km/h, sane for a mixed route.
+  assert.ok(Math.round((575 / 345) * 60) === 100);
 });

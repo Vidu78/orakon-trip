@@ -12,6 +12,8 @@ export interface CreateTripInput {
   start: GeoPoint;
   end: GeoPoint;
   route?: GeoPoint[];
+  routeKm?: number;
+  routeMin?: number;
   batteryEst?: number;
 }
 

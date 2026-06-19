@@ -7,8 +7,16 @@ import type { GeoPoint } from '../../agents/src/types';
 const OSRM = (process.env.OSRM_URL ?? 'https://router.project-osrm.org').replace(/\/+$/, '');
 const MAX_POINTS = 400;
 
-/** Road geometry through the waypoints. Returns null on failure (caller falls back). */
-export async function roadRoute(waypoints: GeoPoint[]): Promise<GeoPoint[] | null> {
+export interface RoadRoute {
+  points: GeoPoint[];
+  /** Driving distance along roads (km). */
+  km: number;
+  /** OSRM driving duration (minutes) — real road speeds, not a flat assumption. */
+  min: number;
+}
+
+/** Road geometry + real distance/duration. Returns null on failure (caller falls back). */
+export async function roadRoute(waypoints: GeoPoint[]): Promise<RoadRoute | null> {
   if (waypoints.length < 2) return null;
   const coords = waypoints.map((p) => `${p.lng},${p.lat}`).join(';');
   const url = `${OSRM}/route/v1/driving/${coords}?overview=full&geometries=geojson`;
@@ -17,16 +25,21 @@ export async function roadRoute(waypoints: GeoPoint[]): Promise<GeoPoint[] | nul
     if (!res.ok) return null;
     const data = (await res.json()) as {
       code?: string;
-      routes?: Array<{ geometry?: { coordinates?: [number, number][] } }>;
+      routes?: Array<{ distance?: number; duration?: number; geometry?: { coordinates?: [number, number][] } }>;
     };
-    const raw = data.routes?.[0]?.geometry?.coordinates;
+    const route = data.routes?.[0];
+    const raw = route?.geometry?.coordinates;
     if (data.code !== 'Ok' || !raw || raw.length < 2) return null;
 
     const points = downsample(raw, MAX_POINTS).map(([lng, lat]): GeoPoint => ({ lat, lng }));
     // Preserve the endpoint labels (start/end) on the road geometry.
     points[0]!.label = waypoints[0]!.label;
     points[points.length - 1]!.label = waypoints[waypoints.length - 1]!.label;
-    return points;
+    return {
+      points,
+      km: Math.round((route.distance ?? 0) / 1000),
+      min: Math.round((route.duration ?? 0) / 60),
+    };
   } catch {
     return null;
   }

@@ -46,6 +46,9 @@ export class PostgresStore implements TripStore {
   async createTrip(input: CreateTripInput): Promise<Trip> {
     const id = input.id ?? randomUUID();
     const route = input.route?.length ? input.route : [input.start, input.end];
+    // ponytail: routeKm/routeMin not persisted here — derived from OSRM and cheap
+    // to recompute on next create; Postgres is unused in prod (in-memory). Add
+    // columns + map them if/when DB persistence of trips actually ships.
     const { rows } = await this.pool.query(
       `insert into trips (id, start, "end", route, battery_est, status)
        values ($1, $2, $3, $4, $5, 'running')

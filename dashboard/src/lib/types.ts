@@ -12,6 +12,9 @@ export interface Trip {
   start: GeoPoint;
   end: GeoPoint;
   route: GeoPoint[];
+  /** OSRM road distance (km) / duration (min) — real-speed at-rest ETA. */
+  routeKm?: number;
+  routeMin?: number;
   batteryEst: number;
   status: TripStatus;
   createdAt: string;

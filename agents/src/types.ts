@@ -19,6 +19,10 @@ export interface Trip {
   end: GeoPoint;
   /** Ordered waypoints from start to end. */
   route: GeoPoint[];
+  /** Driving distance along roads (km), from OSRM. Absent when routing failed. */
+  routeKm?: number;
+  /** OSRM driving duration (minutes) — real road speeds for the at-rest ETA. */
+  routeMin?: number;
   /** Estimated battery % at arrival (0–100). */
   batteryEst: number;
   status: TripStatus;

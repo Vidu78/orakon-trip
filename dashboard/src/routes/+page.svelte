@@ -79,8 +79,13 @@
     if (trip.route && trip.route.length > 1) return remainingRouteKm(p, trip.route, trip.end);
     return haversineKm(p, trip.end);
   });
-  // Live speed if we have it, otherwise assume a motorway cruise for the estimate.
-  const effectiveSpeed = $derived(telemetry && telemetry.speed > 0 ? telemetry.speed : 100);
+  // At rest, use OSRM's real road duration (avg speed) rather than a flat guess;
+  // fall back to a motorway cruise only when the backend gave no routing.
+  const restSpeed = $derived(
+    trip?.routeKm && trip?.routeMin ? (trip.routeKm / trip.routeMin) * 60 : 100,
+  );
+  // Live speed if we have it, otherwise the at-rest estimate.
+  const effectiveSpeed = $derived(telemetry && telemetry.speed > 0 ? telemetry.speed : restSpeed);
   const etaMin = $derived.by(() => (kmLeft == null ? null : Math.round((kmLeft / effectiveSpeed) * 60)));
   const progressPct = $derived.by(() =>
     totalKm > 0 && kmLeft != null ? Math.max(0, Math.min(100, Math.round((1 - kmLeft / totalKm) * 100))) : 0,
