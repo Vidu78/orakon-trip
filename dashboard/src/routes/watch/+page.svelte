@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { API_URL, TRIP_ID } from '$lib/config';
   import type { GeoPoint, Telemetry, Trip, TripStatus } from '$lib/types';
+  import { nextChargeStop, type NextStop } from '$lib/chargePlan';
 
   const deviceId = 'web-watch';
   let connected = $state(false);
@@ -30,6 +31,29 @@
     return Math.round((kmLeft / spd) * 60);
   });
   const battery = $derived(telemetry?.battery ?? trip?.batteryEst ?? null);
+
+  // Next charge stop along the route, snapped to the nearest of the 142k
+  // chargers. Recomputed off telemetry but throttled — nearbyChargers scans the
+  // whole network, too heavy to run on every ~1s tick.
+  let nextStop = $state<NextStop | null>(null);
+  let lastPlanAt = 0;
+  let planning = false;
+  $effect(() => {
+    const t = telemetry;
+    const tr = trip;
+    if (!tr || tr.status === 'completed') {
+      nextStop = null;
+      return;
+    }
+    const now = Date.now();
+    if (planning || now - lastPlanAt < 5000) return;
+    planning = true;
+    lastPlanAt = now;
+    nextChargeStop(tr, t)
+      .then((s) => (nextStop = s))
+      .catch(() => {})
+      .finally(() => (planning = false));
+  });
 
   function fmtEta(m: number): string {
     if (m < 60) return `${m}m`;
@@ -128,6 +152,19 @@
       </div>
     {:else if accepted}
       <div class="done">✓ Inviato all'auto</div>
+    {:else if nextStop?.charger}
+      <div class="stop">
+        <div class="slabel">⚡ Prossima sosta</div>
+        <div class="sname">{nextStop.charger.name}</div>
+        <div class="smeta">
+          tra {nextStop.kmToStop} km{#if nextStop.etaMin != null} · ~{fmtEta(nextStop.etaMin)}{/if}{#if nextStop.charger.powerKW} · {nextStop.charger.powerKW} kW{/if}
+        </div>
+      </div>
+    {:else if nextStop}
+      <div class="stop warn">
+        <div class="slabel">⚡ Ricarica necessaria</div>
+        <div class="smeta">nessuna colonnina entro 40 km · tra {nextStop.kmToStop} km</div>
+      </div>
     {:else}
       <div class="trip">{trip?.start?.label ?? '—'} → {trip?.end?.label ?? '—'}</div>
     {/if}
@@ -183,6 +220,21 @@
   .metrics b { font-size: 18px; font-weight: 700; }
   .metrics span { font-size: 10px; color: #8a96b3; text-transform: uppercase; letter-spacing: 0.06em; }
   .trip { margin-top: 12px; font-size: 12px; color: #8a96b3; }
+  .stop {
+    margin-top: 10px;
+    width: 100%;
+    background: #10233a;
+    border: 1px solid #2dd4bf44;
+    border-radius: 14px;
+    padding: 8px 12px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+  .stop.warn { background: #2a2412; border-color: #e0c25755; }
+  .slabel { font-size: 11px; color: #5eead4; text-transform: uppercase; letter-spacing: 0.06em; }
+  .stop.warn .slabel { color: #f1d98a; }
+  .sname { font-size: 14px; font-weight: 700; color: #e7ecf5; margin-top: 2px; line-height: 1.2; }
+  .smeta { font-size: 11px; color: #8a96b3; margin-top: 2px; }
   .alert {
     margin-top: 10px;
     width: 100%;
