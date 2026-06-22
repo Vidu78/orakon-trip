@@ -10,6 +10,7 @@
   let telemetry = $state<Telemetry | null>(null);
   let alert = $state<{ action: string; reason: string } | null>(null);
   let accepted = $state(false);
+  let dismissed = $state(false);
   let socket: import('socket.io-client').Socket | undefined;
 
   function haversineKm(a: GeoPoint, b: GeoPoint): number {
@@ -71,12 +72,26 @@
   const CIRC = 2 * Math.PI * R;
   const dash = $derived(battery != null ? CIRC * (1 - Math.max(0, Math.min(100, battery)) / 100) : CIRC);
 
+  const INTENT_LABELS: Record<string, string> = {
+    charger: '⚡ Ricarica consigliata',
+    route: '🗺️ Nuova rotta suggerita',
+    pause: '⏸ Sosta consigliata',
+  };
+
   function accept() {
     if (!alert) return;
     socket?.emit('device:action', { tripId: TRIP_ID, deviceId, action: 'accept', intent: alert.action });
     accepted = true;
     alert = null;
     setTimeout(() => (accepted = false), 2500);
+  }
+
+  function dismiss() {
+    if (!alert) return;
+    socket?.emit('device:action', { tripId: TRIP_ID, deviceId, action: 'dismiss', intent: alert.action });
+    dismissed = true;
+    alert = null;
+    setTimeout(() => (dismissed = false), 1500);
   }
 
   onMount(() => {
@@ -101,7 +116,7 @@
       socket.on('telemetry', ({ telemetry: t }: { telemetry: Telemetry }) => (telemetry = t));
       socket.on('trip:state', (t: Trip) => (trip = t));
       socket.on('intent:suggestion', (s: { action: string; reason: string }) => {
-        if (s.action === 'charger') alert = s;
+        alert = s; // show all intent types as an actionable card
       });
     })();
     return () => socket?.disconnect();
@@ -144,14 +159,16 @@
 
     {#if alert}
       <div class="alert">
-        <div class="atxt">⚡ Ricarica consigliata<br /><small>{alert.reason}</small></div>
+        <div class="atxt">{INTENT_LABELS[alert.action] ?? '💡 Suggerimento'}<br /><small>{alert.reason}</small></div>
         <div class="abtns">
-          <button class="ok" onclick={accept}>Accetta</button>
-          <button class="no" onclick={() => (alert = null)}>✕</button>
+          <button class="ok" onclick={accept}>✓</button>
+          <button class="no" onclick={dismiss}>✕</button>
         </div>
       </div>
     {:else if accepted}
       <div class="done">✓ Inviato all'auto</div>
+    {:else if dismissed}
+      <div class="done" style="color:#8a96b3">✕ Ignorato</div>
     {:else if nextStop?.charger}
       <div class="stop">
         <div class="slabel">⚡ Prossima sosta</div>
