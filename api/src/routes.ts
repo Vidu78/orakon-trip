@@ -127,6 +127,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   // GET /chargers?lat=&lng=&radius=&max= — nearby EV chargers (Orakon live-pack, 142k OCM).
   app.get<{ Querystring: { lat?: string; lng?: string; radius?: string; max?: string } }>(
     '/chargers',
+    { config: { rateLimit: { max: 30, timeWindow: 60_000 } } },
     async (req, reply) => {
       const lat = Number(req.query.lat);
       const lng = Number(req.query.lng);
@@ -158,7 +159,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.get<{
     Params: { id: string };
     Querystring: { model?: string; factor?: string; rangeKm?: string; reserve?: string; battery?: string };
-  }>('/trips/:id/charge-plan', async (req, reply) => {
+  }>('/trips/:id/charge-plan', { config: { rateLimit: { max: 20, timeWindow: 60_000 } } }, async (req, reply) => {
     const trip = await store.getTrip(req.params.id);
     if (!trip) return reply.code(404).send({ error: 'trip not found' });
 

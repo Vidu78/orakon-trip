@@ -17,6 +17,14 @@ export interface VehicleMeta {
   realWorldFactor: number;
 }
 
+export interface PlanStop {
+  atKm: number;
+  point: GeoPoint;
+  batteryAtStopPct: number;
+  charger: Charger | null;
+  alternatives: Charger[];
+}
+
 export interface ChargePlan {
   needsCharge: boolean;
   rangeKm: number;
@@ -25,64 +33,65 @@ export interface ChargePlan {
   totalKm: number;
   batteryAtArrivalPct: number;
   vehicle: VehicleMeta | null;
-  stop: null | {
-    atKm: number;
-    point: GeoPoint;
-    batteryAtStopPct: number;
-    charger: Charger | null;
-    alternatives: Charger[];
-  };
+  stops: PlanStop[];
+  /** @deprecated use stops[0] */
+  stop: PlanStop | null;
 }
+
+const TARGET_PCT = 80; // charge back up to this at each stop
+const MAX_STOPS = 8;
 
 export async function planCharging(
   trip: Trip,
   opts: { rangeKm: number; reservePct: number; startBatteryPct: number; vehicle?: VehicleMeta | null },
 ): Promise<ChargePlan> {
-  const { rangeKm, reservePct, startBatteryPct } = opts;
+  const { rangeKm, reservePct } = opts;
   const vehicle = opts.vehicle ?? null;
   const route = trip.route && trip.route.length >= 2 ? trip.route : [trip.start, trip.end];
 
-  // Cumulative distance (km) at each route point.
   const cum: number[] = [0];
   for (let i = 1; i < route.length; i++) {
     cum.push(cum[i - 1]! + haversineKm(route[i - 1]!, route[i]!));
   }
   const totalKm = cum[cum.length - 1]!;
-  const pctPerKm = 100 / rangeKm;
-  const batteryAtArrivalPct = startBatteryPct - totalKm * pctPerKm;
 
-  const base = {
-    rangeKm,
-    reservePct,
-    startBatteryPct,
-    totalKm: round(totalKm),
-    batteryAtArrivalPct: round(batteryAtArrivalPct),
-    vehicle,
-  };
+  const base = { rangeKm, reservePct, startBatteryPct: opts.startBatteryPct, totalKm: round(totalKm), vehicle };
 
-  // Enough charge to arrive above the reserve → no stop needed.
-  if (batteryAtArrivalPct >= reservePct) {
-    return { needsCharge: false, ...base, stop: null };
-  }
+  let battery = opts.startBatteryPct;
+  let posKm = 0;
+  const stops: PlanStop[] = [];
 
-  // Distance at which the battery would hit the reserve threshold.
-  const kmToReserve = Math.max(0, ((startBatteryPct - reservePct) / 100) * rangeKm);
-  const point = pointAtKm(route, cum, kmToReserve);
+  for (let guard = 0; guard < MAX_STOPS; guard++) {
+    const reachableKm = posKm + (rangeKm * (battery - reservePct)) / 100;
+    if (reachableKm >= totalKm) break; // can finish without another stop
 
-  const chargers = await findChargers(point.lat, point.lng, 20, 10).catch(() => [] as Charger[]);
-  const fast = chargers.filter((c) => (c.powerKW ?? 0) >= 50);
-  const list = fast.length ? fast : chargers;
+    const stopKm = Math.max(posKm + 0.1, Math.min(totalKm, reachableKm));
+    const point = pointAtKm(route, cum, stopKm);
 
-  return {
-    needsCharge: true,
-    ...base,
-    stop: {
-      atKm: round(kmToReserve),
+    const chargers = await findChargers(point.lat, point.lng, 20, 10).catch(() => [] as Charger[]);
+    const fast = chargers.filter((c) => (c.powerKW ?? 0) >= 50);
+    const list = fast.length ? fast : chargers;
+
+    stops.push({
+      atKm: round(stopKm),
       point,
       batteryAtStopPct: reservePct,
       charger: list[0] ?? null,
       alternatives: list.slice(0, 5),
-    },
+    });
+
+    posKm = stopKm;
+    battery = TARGET_PCT; // assume recharged to 80% at each stop
+  }
+
+  const batteryAtArrivalPct = round(battery - ((totalKm - posKm) / rangeKm) * 100);
+
+  return {
+    needsCharge: stops.length > 0,
+    ...base,
+    batteryAtArrivalPct,
+    stops,
+    stop: stops[0] ?? null,
   };
 }
 
