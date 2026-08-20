@@ -1,3 +1,4 @@
+import type Anthropic from '@anthropic-ai/sdk';
 import type { IntentAction, IntentResult } from '../../../agents/src/types';
 
 const SYSTEM_BASE = `You classify a driver's natural-language request during a road trip into exactly ONE action:
@@ -12,7 +13,10 @@ const SYSTEM_JSON = `${SYSTEM_BASE}
 Respond ONLY with a JSON object of this exact shape:
 {"action":"route|pause|charger","reason":"short reason","target":"optional place or charger"}`;
 
-const TOOL = {
+// Tipizzato con il tipo dell'SDK invece che con `as const`: dalla 0.6x
+// `input_schema.required` vuole un `string[]` mutabile, e `as const` lo
+// rendeva `readonly [...]`. Usato solo dal path Anthropic (Groq usa JSON mode).
+const TOOL: Anthropic.Tool = {
   name: 'classify_intent',
   description: 'Classify the driver request into a single trip action.',
   input_schema: {
@@ -28,7 +32,7 @@ const TOOL = {
     required: ['action', 'reason'],
     additionalProperties: false,
   },
-} as const;
+};
 
 const ACTIONS: IntentAction[] = ['route', 'pause', 'charger'];
 
