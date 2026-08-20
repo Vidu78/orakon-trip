@@ -7,6 +7,9 @@ on:
     - cron: '*/10 * * * *'
   workflow_dispatch: {}
 
+# Serve solo a fare un curl: nessun permesso sul repo.
+permissions: {}
+
 jobs:
   ping:
     runs-on: ubuntu-latest
